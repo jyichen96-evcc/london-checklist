@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>伦敦看房清单</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #fff; color: #1d1d1f;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 16px; line-height: 1.5;
+      -webkit-text-size-adjust: 100%;
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+    main { max-width: 680px; margin: 0 auto; padding: 20px 16px 80px; }
+
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+
+    .section { margin-bottom: 28px; }
+    .section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #888;
+      border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; margin-bottom: 12px;
+    }
+
+    .card {
+      background: #f8f8f7; border: 1px solid #eee; border-radius: 10px; padding: 14px;
+    }
+
+    .field { margin-bottom: 12px; }
+    .field:last-child { margin-bottom: 0; }
+    .field-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .field-row .field { flex: 1 1 140px; }
+    .field-label {
+      display: block; font-size: 12px; font-weight: 600; color: #888;
+      margin-bottom: 4px;
+    }
+    .field input[type="text"],
+    .field input[type="datetime-local"],
+    .field textarea,
+    .field select {
+      display: block; width: 100%;
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      padding: 10px; font: inherit; font-size: 16px;
+      background: #fff; color: #1d1d1f;
+      -webkit-appearance: none;
+    }
+    .field textarea { min-height: 68px; resize: vertical; }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      outline: none; border-color: #2d5a9e;
+    }
+
+    .focus-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .focus-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 6px 12px; border: 1px solid #d0d0d0; border-radius: 18px;
+      font-size: 14px; background: #fff; color: #1d1d1f; cursor: pointer;
+      -webkit-user-select: none; user-select: none;
+    }
+    .focus-tag.active { background: #2d5a9e; border-color: #2d5a9e; color: #fff; }
+    .focus-remove {
+      display: inline-block; margin-left: 2px; font-size: 16px; line-height: 1;
+      cursor: pointer; opacity: 0.6;
+    }
+    .focus-tag.active .focus-remove { opacity: 1; color: #fff; }
+    .focus-add-row { display: flex; gap: 8px; }
+    .focus-add-row input {
+      flex: 1; border: 1px solid #d0d0d0; border-radius: 18px;
+      padding: 6px 14px; font: inherit; font-size: 14px;
+      background: #fff; color: #1d1d1f;
+    }
+    .focus-add-row input:focus { outline: none; border-color: #2d5a9e; }
+    .focus-add-row button {
+      border: 1px solid #2d5a9e; border-radius: 18px;
+      padding: 6px 14px; font: inherit; font-size: 14px;
+      background: #2d5a9e; color: #fff; cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .group-title { font-size: 15px; font-weight: 600; margin: 18px 0 6px; }
+    .group-title:first-child { margin-top: 0; }
+
+    .ci {
+      display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start;
+      padding: 10px 0; border-bottom: 1px solid #eee;
+    }
+    .ci:last-child { border-bottom: none; }
+    .ci input[type="checkbox"] {
+      width: 22px; height: 22px; margin-top: 1px;
+      accent-color: #2d5a9e; cursor: pointer;
+    }
+    .ci .ci-label { font-size: 15px; cursor: pointer; }
+    .ci .ci-label input[type="text"] {
+      width: 100%; border: 1px solid #d0d0d0; border-radius: 6px;
+      padding: 6px 8px; font: inherit; font-size: 15px;
+      background: #fff; color: #1d1d1f;
+    }
+    .ci textarea {
+      grid-column: 2; min-height: 40px; font-size: 14px;
+      border: 1px solid #d0d0d0; border-radius: 6px;
+      padding: 8px; font-family: inherit; background: #fff; color: #1d1d1f;
+      resize: vertical;
+    }
+    .ci textarea:focus { outline: none; border-color: #2d5a9e; }
+    .ci .photo-btn {
+      grid-column: 2; justify-self: start;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 5px 10px; border: 1px solid #ccc; border-radius: 6px;
+      font-size: 13px; color: #666; background: #fff; cursor: pointer;
+    }
+    .ci .photo-btn input[type="file"] { display: none; }
+    .ci .photo-gallery {
+      grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .ci .photo-thumb { position: relative; width: 64px; height: 64px; }
+    .ci .photo-thumb img {
+      width: 100%; height: 100%; object-fit: cover;
+      border-radius: 6px; border: 1px solid #ddd;
+    }
+    .ci .photo-del {
+      position: absolute; top: -4px; right: -4px;
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 1px solid #ccc; background: #fff; color: #888;
+      font-size: 13px; text-align: center; line-height: 18px;
+      cursor: pointer; padding: 0;
+    }
+    .ci .ci-del {
+      grid-column: 2; justify-self: start;
+      border: none; background: none; color: #c44; font-size: 13px;
+      cursor: pointer; padding: 2px 0;
+    }
+    .add-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin-top: 10px; padding: 8px 14px;
+      border: 1px dashed #ccc; border-radius: 8px;
+      background: transparent; color: #888;
+      font: inherit; font-size: 14px; cursor: pointer;
+    }
+
+    .score-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid #eee;
+    }
+    .score-row:last-of-type { border-bottom: none; }
+    .score-row .score-label { flex: 1; font-size: 14px; }
+    .score-row input[type="range"] {
+      width: 120px; -webkit-appearance: none; appearance: none;
+      height: 6px; background: #ddd; border-radius: 3px; outline: none;
+    }
+    .score-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 24px; height: 24px;
+      border-radius: 50%; background: #2d5a9e; border: 2px solid #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15); cursor: pointer;
+    }
+    .score-val {
+      min-width: 24px; text-align: center;
+      font-size: 16px; font-weight: 700; color: #2d5a9e;
+    }
+    .avg-box {
+      display: flex; align-items: baseline; gap: 6px;
+      margin-top: 10px; padding: 10px 14px;
+      background: #e8eff8; border-radius: 8px;
+    }
+    .avg-num { font-size: 26px; font-weight: 700; color: #2d5a9e; }
+    .avg-label { font-size: 13px; color: #888; }
+
+    .actions {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      margin-top: 28px; padding-top: 16px; border-top: 1px solid #e0e0e0;
+    }
+    .btn {
+      padding: 10px 20px; border-radius: 8px;
+      font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; border: none;
+    }
+    .btn-light { background: #f0f0f0; color: #666; }
+    .btn-blue { background: #2d5a9e; color: #fff; }
+    .toast { margin-top: 8px; font-size: 13px; color: #3a7d34; min-height: 18px; }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1a18; color: #e0ddd8; }
+      .card { background: #242422; border-color: #333; }
+      .field input, .field textarea, .field select,
+      .ci textarea, .ci .ci-label input, .focus-add-row input,
+      .ci .photo-btn, .focus-tag { background: #1a1a18; color: #e0ddd8; border-color: #444; }
+      .focus-tag.active { background: #6b9fe8; border-color: #6b9fe8; color: #111; }
+      .focus-add-row button { background: #6b9fe8; border-color: #6b9fe8; color: #111; }
+      .score-row input[type="range"] { background: #444; }
+      .score-row input[type="range"]::-webkit-slider-thumb { background: #6b9fe8; border-color: #242422; }
+      .score-val { color: #6b9fe8; }
+      .avg-box { background: #1e2a3a; }
+      .avg-num { color: #6b9fe8; }
+      .btn-light { background: #333; color: #aaa; }
+      .btn-blue { background: #6b9fe8; color: #111; }
+      .ci { border-color: #333; }
+      .score-row { border-color: #333; }
+      .actions { border-color: #333; }
+      .section-title { border-color: #333; }
+      .ci input[type="checkbox"] { accent-color: #6b9fe8; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>伦敦代看房现场清单</h1>
+  <p class="subtitle">请用 Safari 打开（非微信），数据会自动保存在浏览器中</p>
+
+  <div class="section">
+    <div class="section-title">房源信息</div>
+    <div class="card">
+      <div class="field-row">
+        <div class="field"><span class="field-label">房源名称</span><input data-save="address" type="text" placeholder="East Village / Flat 12"></div>
+        <div class="field"><span class="field-label">看房时间</span><input data-save="time" type="datetime-local"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><span class="field-label">中介联系方式</span><input data-save="agent" type="text"></div>
+        <div class="field"><span class="field-label">租金 / Bills</span><input data-save="rent" type="text" placeholder="£2,300 / pcm"></div>
+      </div>
+      <div class="field"><span class="field-label">房源链接</span><input data-save="link" type="text"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">特别关注（点击选中，可增删）</div>
+    <div class="card">
+      <div class="focus-list" id="focusList"></div>
+      <div class="focus-add-row">
+        <input id="focusInput" type="text" placeholder="输入新的关注点…">
+        <button id="focusAdd" type="button">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">现场检查</div>
+    <div class="card">
+
+      <div class="group-title">采光、空间与环境</div>
+      <div class="ci"><input type="checkbox" id="c0" data-save="c0"><label class="ci-label" for="c0">采光、日照与遮挡</label><textarea data-save="c0-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c0"></label><div class="photo-gallery" data-gallery="c0"></div></div>
+      <div class="ci"><input type="checkbox" id="c1" data-save="c1"><label class="ci-label" for="c1">窗户方向／朝向</label><textarea data-save="c1-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c1"></label><div class="photo-gallery" data-gallery="c1"></div></div>
+      <div class="ci"><input type="checkbox" id="c2" data-save="c2"><label class="ci-label" for="c2">房间尺度、布局与动线</label><textarea data-save="c2-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c2"></label><div class="photo-gallery" data-gallery="c2"></div></div>
+      <div class="ci"><input type="checkbox" id="c3" data-save="c3"><label class="ci-label" for="c3">储物空间</label><textarea data-save="c3-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c3"></label><div class="photo-gallery" data-gallery="c3"></div></div>
+      <div class="ci"><input type="checkbox" id="c4" data-save="c4"><label class="ci-label" for="c4">天花高度／压迫感</label><textarea data-save="c4-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c4"></label><div class="photo-gallery" data-gallery="c4"></div></div>
+      <div class="ci"><input type="checkbox" id="c5" data-save="c5"><label class="ci-label" for="c5">通风、可开窗情况</label><textarea data-save="c5-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c5"></label><div class="photo-gallery" data-gallery="c5"></div></div>
+      <div class="ci"><input type="checkbox" id="c6" data-save="c6"><label class="ci-label" for="c6">主路、铁路、施工噪音</label><textarea data-save="c6-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c6"></label><div class="photo-gallery" data-gallery="c6"></div></div>
+      <div class="ci"><input type="checkbox" id="c7" data-save="c7"><label class="ci-label" for="c7">邻居、走廊、电梯噪音</label><textarea data-save="c7-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c7"></label><div class="photo-gallery" data-gallery="c7"></div></div>
+      <div class="ci"><input type="checkbox" id="c8" data-save="c8"><label class="ci-label" for="c8">对望、楼距与隐私</label><textarea data-save="c8-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c8"></label><div class="photo-gallery" data-gallery="c8"></div></div>
+      <div class="ci"><input type="checkbox" id="c9" data-save="c9"><label class="ci-label" for="c9">墙角、窗边潮湿／霉斑</label><textarea data-save="c9-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c9"></label><div class="photo-gallery" data-gallery="c9"></div></div>
+      <div class="ci"><input type="checkbox" id="c10" data-save="c10"><label class="ci-label" for="c10">水渍、异味、渗漏迹象</label><textarea data-save="c10-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c10"></label><div class="photo-gallery" data-gallery="c10"></div></div>
+
+      <div class="group-title">家具、家电与楼栋</div>
+      <div class="ci"><input type="checkbox" id="c11" data-save="c11"><label class="ci-label" for="c11">家具清单与实际状况</label><textarea data-save="c11-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c11"></label><div class="photo-gallery" data-gallery="c11"></div></div>
+      <div class="ci"><input type="checkbox" id="c12" data-save="c12"><label class="ci-label" for="c12">冰箱／冷冻／烤箱／灶具</label><textarea data-save="c12-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c12"></label><div class="photo-gallery" data-gallery="c12"></div></div>
+      <div class="ci"><input type="checkbox" id="c13" data-save="c13"><label class="ci-label" for="c13">洗衣机／烘干机</label><textarea data-save="c13-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c13"></label><div class="photo-gallery" data-gallery="c13"></div></div>
+      <div class="ci"><input type="checkbox" id="c14" data-save="c14"><label class="ci-label" for="c14">热水、暖气与温控</label><textarea data-save="c14-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c14"></label><div class="photo-gallery" data-gallery="c14"></div></div>
+      <div class="ci"><input type="checkbox" id="c15" data-save="c15"><label class="ci-label" for="c15">水压与排水</label><textarea data-save="c15-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c15"></label><div class="photo-gallery" data-gallery="c15"></div></div>
+      <div class="ci"><input type="checkbox" id="c16" data-save="c16"><label class="ci-label" for="c16">网络供应商／信号</label><textarea data-save="c16-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c16"></label><div class="photo-gallery" data-gallery="c16"></div></div>
+      <div class="ci"><input type="checkbox" id="c17" data-save="c17"><label class="ci-label" for="c17">插座数量与位置</label><textarea data-save="c17-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c17"></label><div class="photo-gallery" data-gallery="c17"></div></div>
+      <div class="ci"><input type="checkbox" id="c18" data-save="c18"><label class="ci-label" for="c18">前台、快递、门禁</label><textarea data-save="c18-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c18"></label><div class="photo-gallery" data-gallery="c18"></div></div>
+      <div class="ci"><input type="checkbox" id="c19" data-save="c19"><label class="ci-label" for="c19">垃圾房、自行车位、公区</label><textarea data-save="c19-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c19"></label><div class="photo-gallery" data-gallery="c19"></div></div>
+      <div class="ci"><input type="checkbox" id="c20" data-save="c20"><label class="ci-label" for="c20">电梯数量与等候情况</label><textarea data-save="c20-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c20"></label><div class="photo-gallery" data-gallery="c20"></div></div>
+      <div class="ci"><input type="checkbox" id="c21" data-save="c21"><label class="ci-label" for="c21">物业维护与施工公告</label><textarea data-save="c21-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c21"></label><div class="photo-gallery" data-gallery="c21"></div></div>
+
+      <div class="group-title">租赁细节与周边</div>
+      <div class="ci"><input type="checkbox" id="c22" data-save="c22"><label class="ci-label" for="c22">租期、押金、起租日</label><textarea data-save="c22-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c22"></label><div class="photo-gallery" data-gallery="c22"></div></div>
+      <div class="ci"><input type="checkbox" id="c23" data-save="c23"><label class="ci-label" for="c23">Bills、Council Tax、网络</label><textarea data-save="c23-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c23"></label><div class="photo-gallery" data-gallery="c23"></div></div>
+      <div class="ci"><input type="checkbox" id="c24" data-save="c24"><label class="ci-label" for="c24">宠物、转租、提前解约规则</label><textarea data-save="c24-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c24"></label><div class="photo-gallery" data-gallery="c24"></div></div>
+      <div class="ci"><input type="checkbox" id="c25" data-save="c25"><label class="ci-label" for="c25">车站距离与实际步行路线</label><textarea data-save="c25-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c25"></label><div class="photo-gallery" data-gallery="c25"></div></div>
+      <div class="ci"><input type="checkbox" id="c26" data-save="c26"><label class="ci-label" for="c26">公交、地铁及通勤时间</label><textarea data-save="c26-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c26"></label><div class="photo-gallery" data-gallery="c26"></div></div>
+      <div class="ci"><input type="checkbox" id="c27" data-save="c27"><label class="ci-label" for="c27">超市、餐厅、健身房</label><textarea data-save="c27-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c27"></label><div class="photo-gallery" data-gallery="c27"></div></div>
+      <div class="ci"><input type="checkbox" id="c28" data-save="c28"><label class="ci-label" for="c28">公园与绿地</label><textarea data-save="c28-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c28"></label><div class="photo-gallery" data-gallery="c28"></div></div>
+      <div class="ci"><input type="checkbox" id="c29" data-save="c29"><label class="ci-label" for="c29">夜间照明与安全感</label><textarea data-save="c29-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c29"></label><div class="photo-gallery" data-gallery="c29"></div></div>
+      <div class="ci"><input type="checkbox" id="c30" data-save="c30"><label class="ci-label" for="c30">外卖、快递、收件便利</label><textarea data-save="c30-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c30"></label><div class="photo-gallery" data-gallery="c30"></div></div>
+      <div class="ci"><input type="checkbox" id="c31" data-save="c31"><label class="ci-label" for="c31">附近施工、酒吧或大型活动</label><textarea data-save="c31-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="c31"></label><div class="photo-gallery" data-gallery="c31"></div></div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">自定义检查项</div>
+    <div class="card">
+      <div id="customItems"></div>
+      <button class="add-btn" id="addCustom" type="button">+ 添加检查项</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">整体结论</div>
+    <div class="card">
+      <div class="score-row"><span class="score-label">房屋本身</span><input class="score-input" data-save="score-property" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
+      <div class="score-row"><span class="score-label">居住舒适度</span><input class="score-input" data-save="score-comfort" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
+      <div class="score-row"><span class="score-label">家具家电</span><input class="score-input" data-save="score-appliances" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
+      <div class="score-row"><span class="score-label">楼栋与物业</span><input class="score-input" data-save="score-building" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
+      <div class="score-row"><span class="score-label">区域与通勤</span><input class="score-input" data-save="score-area" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
+      <div class="score-row"><span class="score-label">性价比</span><input class="score-input" data-save="score-value" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
+      <div class="avg-box"><span class="avg-num" id="avgScore">–</span><span class="avg-label">/ 10 平均分</span></div>
+      <div class="field" style="margin-top:14px"><span class="field-label">是否推荐</span><select data-save="recommend"><option value="">请选择</option><option value="推荐">推荐</option><option value="可考虑">可考虑</option><option value="不建议">不建议</option></select></div>
+      <div class="field"><span class="field-label">核心优点</span><textarea data-save="pros" placeholder="南向、客厅采光好、步行 5 分钟到地铁"></textarea></div>
+      <div class="field"><span class="field-label">需要注意</span><textarea data-save="cons" placeholder="卧室临街；窗边有轻微潮气"></textarea></div>
+      <div class="field"><span class="field-label">建议与下一步</span><textarea data-save="next" placeholder="向中介确认合同起租日和网费"></textarea></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-light" id="clearBtn">清空内容</button>
+    <button class="btn btn-blue" id="exportBtn">导出报告</button>
+  </div>
+  <p class="toast" id="toast"></p>
+</main>
+
+<script>
+(function() {
+  var SK = 'london-viewing-v2';
+  var toastEl = document.getElementById('toast');
+  var defaultFocus = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
+
+  function load() { try { return JSON.parse(localStorage.getItem(SK)) || {}; } catch(e) { return {}; } }
+  function persist(s) { try { localStorage.setItem(SK, JSON.stringify(s)); } catch(e) {} }
+  var state = load();
+
+  function flash(msg) { toastEl.textContent = msg; setTimeout(function() { toastEl.textContent = ''; }, 1500); }
+
+  if (!state.focusTags) state.focusTags = defaultFocus.slice();
+  if (!state.focusActive) state.focusActive = {};
+
+  var focusListEl = document.getElementById('focusList');
+  function renderFocus() {
+    focusListEl.innerHTML = '';
+    for (var i = 0; i < state.focusTags.length; i++) {
+      (function(tag, idx) {
+        var el = document.createElement('span');
+        el.className = 'focus-tag' + (state.focusActive[tag] ? ' active' : '');
+
+        var textSpan = document.createElement('span');
+        textSpan.textContent = tag;
+        textSpan.onclick = function() {
+          state.focusActive[tag] = !state.focusActive[tag];
+          persist(state); renderFocus(); flash('已保存');
+        };
+        el.appendChild(textSpan);
+
+        var del = document.createElement('span');
+        del.className = 'focus-remove';
+        del.textContent = ' ×';
+        del.onclick = function(e) {
+          e.stopPropagation();
+          state.focusTags.splice(idx, 1);
+          delete state.focusActive[tag];
+          persist(state); renderFocus(); flash('已删除');
+        };
+        el.appendChild(del);
+
+        focusListEl.appendChild(el);
+      })(state.focusTags[i], i);
+    }
+  }
+  renderFocus();
+
+  document.getElementById('focusAdd').onclick = function() {
+    var input = document.getElementById('focusInput');
+    var val = input.value.replace(/^\s+|\s+$/g, '');
+    if (!val) return;
+    var exists = false;
+    for (var i = 0; i < state.focusTags.length; i++) { if (state.focusTags[i] === val) { exists = true; break; } }
+    if (!exists) {
+      state.focusTags.push(val);
+      state.focusActive[val] = true;
+      persist(state); renderFocus();
+    }
+    input.value = '';
+    flash('已添加');
+  };
+
+  function applyState() {
+    var els = document.querySelectorAll('[data-save]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]; var key = el.getAttribute('data-save');
+      if (state[key] !== undefined && state[key] !== null) {
+        if (el.type === 'checkbox') el.checked = state[key];
+        else if (el.type === 'range') {
+          el.value = state[key];
+          var vs = el.parentNode ? el.parentNode.querySelector('.score-val') : null;
+          if (vs) vs.textContent = Number(el.value) > 0 ? el.value : '–';
+        } else el.value = state[key];
+      }
+    }
+    updateAvg();
+  }
+
+  function updateAvg() {
+    var inputs = document.querySelectorAll('.score-input');
+    var vals = [];
+    for (var i = 0; i < inputs.length; i++) { var v = Number(inputs[i].value); if (v >= 1 && v <= 10) vals.push(v); }
+    var avgEl = document.getElementById('avgScore');
+    if (vals.length > 0) { var sum = 0; for (var j = 0; j < vals.length; j++) sum += vals[j]; avgEl.textContent = (sum / vals.length).toFixed(1); }
+    else avgEl.textContent = '–';
+  }
+
+  function saveAll() {
+    var els = document.querySelectorAll('[data-save]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]; var key = el.getAttribute('data-save');
+      state[key] = el.type === 'checkbox' ? el.checked : el.value;
+    }
+    persist(state); updateAvg(); flash('已自动保存');
+  }
+
+  document.addEventListener('input', function(e) {
+    if (e.target.getAttribute('data-save')) {
+      if (e.target.type === 'range') {
+        var vs = e.target.parentNode ? e.target.parentNode.querySelector('.score-val') : null;
+        if (vs) vs.textContent = Number(e.target.value) > 0 ? e.target.value : '–';
+      }
+      saveAll();
+    }
+  }, false);
+  document.addEventListener('change', function(e) {
+    if (e.target.getAttribute('data-save')) saveAll();
+  }, false);
+  applyState();
+
+  var photos = {};
+  function renderPhotos(key) {
+    var gallery = document.querySelector('[data-gallery="' + key + '"]');
+    if (!gallery) return;
+    gallery.innerHTML = '';
+    var arr = photos[key] || [];
+    for (var i = 0; i < arr.length; i++) {
+      (function(idx) {
+        var wrap = document.createElement('div'); wrap.className = 'photo-thumb';
+        var img = document.createElement('img'); img.src = arr[idx]; img.alt = '照片'; wrap.appendChild(img);
+        var btn = document.createElement('button'); btn.className = 'photo-del'; btn.type = 'button'; btn.textContent = '×';
+        btn.onclick = function() { photos[key].splice(idx, 1); renderPhotos(key); };
+        wrap.appendChild(btn); gallery.appendChild(wrap);
+      })(i);
+    }
+  }
+  document.addEventListener('change', function(e) {
+    var pk = e.target.getAttribute('data-photo');
+    if (!pk) return;
+    if (!photos[pk]) photos[pk] = [];
+    var files = e.target.files;
+    for (var i = 0; i < files.length; i++) {
+      (function(file) {
+        var reader = new FileReader();
+        reader.onload = function() { photos[pk].push(reader.result); renderPhotos(pk); };
+        reader.readAsDataURL(file);
+      })(files[i]);
+    }
+    e.target.value = '';
+  }, false);
+
+  var customBox = document.getElementById('customItems');
+  function getCustomIds() { return state.customIds || []; }
+  function makeCustomItem(key) {
+    var div = document.createElement('div'); div.className = 'ci';
+    div.innerHTML = '<input type="checkbox" id="' + key + '" data-save="' + key + '">' +
+      '<label class="ci-label" for="' + key + '"><input type="text" data-save="' + key + '-label" placeholder="输入检查项名称"></label>' +
+      '<textarea data-save="' + key + '-n" placeholder="备注"></textarea>' +
+      '<label class="photo-btn">拍照<input type="file" accept="image/*" capture="environment" multiple data-photo="' + key + '"></label>' +
+      '<div class="photo-gallery" data-gallery="' + key + '"></div>' +
+      '<button class="ci-del" type="button" data-delete="' + key + '">删除此项</button>';
+    return div;
+  }
+  function drawCustom() { customBox.innerHTML = ''; var ids = getCustomIds(); for (var i = 0; i < ids.length; i++) customBox.appendChild(makeCustomItem(ids[i])); applyState(); }
+  document.getElementById('addCustom').onclick = function() {
+    var key = 'x' + Date.now();
+    if (!state.customIds) state.customIds = [];
+    state.customIds.push(key); persist(state);
+    customBox.appendChild(makeCustomItem(key));
+  };
+  document.addEventListener('click', function(e) {
+    var dk = e.target.getAttribute('data-delete');
+    if (!dk) return;
+    var ids = getCustomIds(); var newIds = [];
+    for (var i = 0; i < ids.length; i++) { if (ids[i] !== dk) newIds.push(ids[i]); }
+    state.customIds = newIds;
+    delete state[dk]; delete state[dk + '-label']; delete state[dk + '-n'];
+    delete photos[dk]; persist(state); drawCustom(); flash('已删除');
+  }, false);
+  drawCustom();
+
+  document.getElementById('clearBtn').onclick = function() {
+    if (!confirm('确定清空所有填写内容吗？')) return;
+    localStorage.removeItem(SK);
+    state = { focusTags: defaultFocus.slice(), focusActive: {} }; photos = {};
+    var els = document.querySelectorAll('[data-save]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (el.type === 'checkbox') el.checked = false;
+      else if (el.type === 'range') { el.value = 0; var vs = el.parentNode ? el.parentNode.querySelector('.score-val') : null; if (vs) vs.textContent = '–'; }
+      else el.value = '';
+    }
+    renderFocus(); drawCustom(); updateAvg(); flash('已清空');
+  };
+
+  var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动'];
+
+  document.getElementById('exportBtn').onclick = function() {
+    var g = function(k) { return state[k] || '—'; };
+    var checked = [];
+    for (var i = 0; i < itemLabels.length; i++) {
+      var key = 'c' + i;
+      if (state[key]) { var line = '- ' + itemLabels[i]; if (state[key + '-n']) line += '：' + state[key + '-n']; checked.push(line); }
+    }
+    var cids = getCustomIds();
+    for (var j = 0; j < cids.length; j++) {
+      var ck = cids[j];
+      if (state[ck]) { var cl = '- ' + (state[ck + '-label'] || '未命名'); if (state[ck + '-n']) cl += '：' + state[ck + '-n']; checked.push(cl); }
+    }
+    var focusStr = [];
+    for (var f = 0; f < state.focusTags.length; f++) { if (state.focusActive[state.focusTags[f]]) focusStr.push(state.focusTags[f]); }
+    var avgEl = document.getElementById('avgScore');
+    var report = '伦敦代看房现场报告\n\n' +
+      '房源：' + g('address') + '\n时间：' + g('time') + '\n中介：' + g('agent') + '\n租金：' + g('rent') + '\n链接：' + g('link') + '\n\n' +
+      '特别关注：' + (focusStr.join('、') || '—') + '\n\n' +
+      '已检查项目：\n' + (checked.join('\n') || '—') + '\n\n' +
+      '评分\n房屋本身：' + g('score-property') + '/10\n居住舒适度：' + g('score-comfort') + '/10\n家具家电：' + g('score-appliances') + '/10\n楼栋与物业：' + g('score-building') + '/10\n区域与通勤：' + g('score-area') + '/10\n性价比：' + g('score-value') + '/10\n平均分：' + (avgEl.textContent || '—') + '\n是否推荐：' + g('recommend') + '\n\n' +
+      '核心优点：\n' + g('pros') + '\n\n需要注意：\n' + g('cons') + '\n\n建议与下一步：\n' + g('next');
+    var blob = new Blob([report], {type: 'text/plain;charset=utf-8'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = '看房报告-' + (g('address')).replace(/[\\/:*?"<>|]/g, '_') + '.txt';
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+})();
+</script>
+</body>
+</html>
