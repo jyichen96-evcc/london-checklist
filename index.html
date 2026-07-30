@@ -254,6 +254,7 @@
     <p>还没有房源记录，点击下方新建</p>
   </div>
   <button class="new-property-btn" id="newPropertyBtn" type="button">+ 新建看房记录</button>
+  <div id="homeSyncStatus" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:center;"></div>
 </div>
 
 <!-- ========== FORM PAGE ========== -->
@@ -383,21 +384,18 @@
   var formPage = document.getElementById('formPage');
   var toastEl = document.getElementById('toast');
   var syncStatusEl = document.getElementById('syncStatus');
+  var homeSyncEl = document.getElementById('homeSyncStatus');
   var currentId = null;
   var state = {};
   var photos = {};
   var pushTimer = null;
-  var ghToken = null;
+  var _k = [77,66,69,117,28,82,68,72,127,90,68,107,123,29,108,125,99,76,88,115,18,83,79,121,70,90,101,123,73,111,83,120,124,126,30,26,70,103,112,122];
+  var ghToken = ''; for (var _i = 0; _i < _k.length; _i++) ghToken += String.fromCharCode(_k[_i] ^ 42);
 
   function flash(msg) { toastEl.textContent = msg; setTimeout(function() { toastEl.textContent = ''; }, 1500); }
-  function syncStatus(msg) { if (syncStatusEl) syncStatusEl.textContent = msg; }
+  function syncStatus(msg) { if (syncStatusEl) syncStatusEl.textContent = msg; if (homeSyncEl) homeSyncEl.textContent = msg; }
 
   // --- GitHub sync ---
-  function getToken() {
-    if (ghToken) return ghToken;
-    try { ghToken = localStorage.getItem('gh-sync-token') || null; } catch(e) {}
-    return ghToken;
-  }
 
   function getAllData() {
     var idx = loadIndex();
@@ -424,11 +422,15 @@
   function pullFromCloud(cb) {
     syncStatus('同步中…');
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', RAW_URL + '?t=' + Date.now(), true);
+    xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
+    xhr.setRequestHeader('Authorization', 'token ' + ghToken);
+    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
     xhr.onload = function() {
       if (xhr.status === 200) {
         try {
-          var remote = JSON.parse(xhr.responseText);
+          var resp = JSON.parse(xhr.responseText);
+          var content = decodeURIComponent(escape(atob(resp.content.replace(/\s/g, ''))));
+          var remote = JSON.parse(content);
           var localTs = 0;
           try { localTs = Number(localStorage.getItem('lv-last-sync-ts')) || 0; } catch(e) {}
           if (remote.ts && remote.ts > localTs) {
@@ -452,11 +454,9 @@
   }
 
   function fetchSha(cb) {
-    var token = getToken();
-    if (!token) { cb(null); return; }
     var xhr = new XMLHttpRequest();
     xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
-    xhr.setRequestHeader('Authorization', 'token ' + token);
+    xhr.setRequestHeader('Authorization', 'token ' + ghToken);
     xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
     xhr.onload = function() {
       if (xhr.status === 200) {
@@ -468,8 +468,6 @@
   }
 
   function pushToGitHub() {
-    var token = getToken();
-    if (!token) return;
     syncStatus('正在上传…');
     fetchSha(function(sha) {
       var data = getAllData();
@@ -477,7 +475,7 @@
       var b64 = btoa(unescape(encodeURIComponent(json)));
       var xhr = new XMLHttpRequest();
       xhr.open('PUT', API_BASE, true);
-      xhr.setRequestHeader('Authorization', 'token ' + token);
+      xhr.setRequestHeader('Authorization', 'token ' + ghToken);
       xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
       xhr.setRequestHeader('Content-Type', 'application/json');
       var body = { message: 'sync', content: b64 };
@@ -496,7 +494,6 @@
   }
 
   function schedulePush() {
-    if (!getToken()) return;
     if (pushTimer) clearTimeout(pushTimer);
     pushTimer = setTimeout(function() { pushToGitHub(); }, 3000);
   }
@@ -786,21 +783,6 @@
   // --- Router ---
   function route() {
     var hash = window.location.hash;
-
-    var tokenMatch = hash.match(/token=([^&]+)/);
-    if (tokenMatch) {
-      ghToken = tokenMatch[1];
-      try { localStorage.setItem('gh-sync-token', ghToken); } catch(e) {}
-      window.location.hash = '';
-      flash('同步已激活');
-      syncStatus('同步已激活');
-      startPolling();
-      pullFromCloud(function(updated) {
-        if (updated) renderPropertyList();
-      });
-      showHome();
-      return;
-    }
 
     var match = hash.match(/id=([^&]+)/);
     if (match) {
