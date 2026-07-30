@@ -219,39 +219,6 @@
     .btn-blue { background: #2d5a9e; color: #fff; }
     .toast { margin-top: 8px; font-size: 13px; color: #3a7d34; min-height: 18px; }
 
-    /* Sync modal */
-    .sync-overlay {
-      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.4); z-index: 100;
-      align-items: center; justify-content: center; padding: 20px;
-    }
-    .sync-overlay.show { display: flex; }
-    .sync-modal {
-      background: #fff; border-radius: 14px; padding: 24px; max-width: 400px; width: 100%;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-    }
-    .sync-modal h3 { font-size: 18px; margin-bottom: 12px; }
-    .sync-modal p { font-size: 14px; color: #666; margin-bottom: 12px; line-height: 1.5; }
-    .sync-link-box {
-      width: 100%; min-height: 80px; border: 1px solid #d0d0d0; border-radius: 8px;
-      padding: 10px; font-family: inherit; font-size: 13px; color: #333;
-      word-break: break-all; resize: none; background: #f8f8f7;
-    }
-    .sync-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .sync-actions .btn { flex: 1; text-align: center; font-size: 14px; padding: 10px; }
-    .sync-import-row { display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; }
-    .sync-import-row input {
-      flex: 1; border: 1px solid #d0d0d0; border-radius: 8px;
-      padding: 10px; font: inherit; font-size: 14px; background: #fff; color: #1d1d1f;
-    }
-    .sync-import-row .btn { white-space: nowrap; }
-
-    .btn-sync {
-      padding: 10px 20px; border-radius: 8px;
-      font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
-      border: 1px solid #2d5a9e; background: #fff; color: #2d5a9e;
-    }
-
     @media (prefers-color-scheme: dark) {
       body { background: #1a1a18; color: #e0ddd8; }
       .card, .property-item { background: #242422; border-color: #333; }
@@ -272,12 +239,6 @@
       .actions, .section-title { border-color: #333; }
       .ci input[type="checkbox"] { accent-color: #6b9fe8; }
       .new-property-btn { border-color: #444; color: #888; }
-      .sync-modal { background: #242422; }
-      .sync-modal p { color: #aaa; }
-      .sync-link-box { background: #1a1a18; border-color: #444; color: #e0ddd8; }
-      .sync-import-row input { background: #1a1a18; border-color: #444; color: #e0ddd8; }
-      .sync-import-row { border-color: #333; }
-      .btn-sync { border-color: #6b9fe8; color: #6b9fe8; background: transparent; }
     }
   </style>
 </head>
@@ -395,46 +356,146 @@
 
   <div class="actions">
     <button class="btn btn-light" id="clearBtn">清空本条</button>
-    <button class="btn-sync" id="syncBtn" type="button">同步到其他设备</button>
     <button class="btn btn-blue" id="exportBtn">导出报告</button>
   </div>
   <p class="toast" id="toast"></p>
-</div>
-
-<!-- Sync modal -->
-<div class="sync-overlay" id="syncOverlay">
-  <div class="sync-modal">
-    <h3>同步数据</h3>
-    <p>复制下方链接，发给自己（微信、iMessage 等），在另一台设备的 Safari 中打开即可导入。</p>
-    <textarea class="sync-link-box" id="syncLinkBox" readonly></textarea>
-    <div class="sync-actions">
-      <button class="btn btn-blue" id="syncCopyBtn" type="button">复制链接</button>
-      <button class="btn btn-light" id="syncCloseBtn" type="button">关闭</button>
-    </div>
-  </div>
+  <div id="syncStatus" style="margin-top:6px;font-size:12px;color:#888;min-height:16px;"></div>
 </div>
 
 <script>
 (function() {
   var INDEX_KEY = 'lv-index';
+  var REPO = 'jyichen96-evcc/london-checklist';
+  var SYNC_FILE = '_sync/data.json';
+  var API_BASE = 'https://api.github.com/repos/' + REPO + '/contents/' + SYNC_FILE;
   var defaultFocus = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
   var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动'];
 
   var homePage = document.getElementById('homePage');
   var formPage = document.getElementById('formPage');
   var toastEl = document.getElementById('toast');
+  var syncStatusEl = document.getElementById('syncStatus');
   var currentId = null;
   var state = {};
   var photos = {};
+  var remoteSha = null;
+  var pushTimer = null;
+  var ghToken = null;
 
   function flash(msg) { toastEl.textContent = msg; setTimeout(function() { toastEl.textContent = ''; }, 1500); }
+  function syncStatus(msg) { if (syncStatusEl) syncStatusEl.textContent = msg; }
 
-  // --- Index: list of all properties ---
+  // --- GitHub sync ---
+  function getToken() {
+    if (ghToken) return ghToken;
+    try { ghToken = localStorage.getItem('gh-sync-token') || null; } catch(e) {}
+    return ghToken;
+  }
+
+  function getAllData() {
+    var idx = loadIndex();
+    var all = { index: idx, properties: {} };
+    for (var i = 0; i < idx.length; i++) {
+      all.properties[idx[i].id] = loadState(idx[i].id);
+    }
+    all.ts = Date.now();
+    return all;
+  }
+
+  function applyAllData(data) {
+    if (!data || !data.index) return;
+    try { localStorage.setItem(INDEX_KEY, JSON.stringify(data.index)); } catch(e) {}
+    if (data.properties) {
+      for (var id in data.properties) {
+        if (data.properties.hasOwnProperty(id)) {
+          try { localStorage.setItem('lv-' + id, JSON.stringify(data.properties[id])); } catch(e) {}
+        }
+      }
+    }
+  }
+
+  function pullFromGitHub(cb) {
+    var token = getToken();
+    if (!token) { if (cb) cb(false); return; }
+    syncStatus('同步中…');
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', API_BASE, true);
+    xhr.setRequestHeader('Authorization', 'token ' + token);
+    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var resp = JSON.parse(xhr.responseText);
+          remoteSha = resp.sha;
+          var content = decodeURIComponent(escape(atob(resp.content.replace(/\s/g, ''))));
+          var remote = JSON.parse(content);
+          var local = getAllData();
+          if (remote.ts && (!local.ts || remote.ts > local.ts)) {
+            applyAllData(remote);
+            syncStatus('已从云端同步');
+            if (cb) cb(true);
+            return;
+          }
+          syncStatus('数据已是最新');
+        } catch(e) { syncStatus('同步解析失败'); }
+      } else if (xhr.status === 404) {
+        remoteSha = null;
+        syncStatus('云端无数据');
+      } else {
+        syncStatus('同步失败 (' + xhr.status + ')');
+      }
+      if (cb) cb(false);
+    };
+    xhr.onerror = function() { syncStatus('网络错误'); if (cb) cb(false); };
+    xhr.send();
+  }
+
+  function pushToGitHub() {
+    var token = getToken();
+    if (!token) return;
+    var data = getAllData();
+    var json = JSON.stringify(data);
+    var b64 = btoa(unescape(encodeURIComponent(json)));
+    syncStatus('正在上传…');
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', API_BASE, true);
+    xhr.setRequestHeader('Authorization', 'token ' + token);
+    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    var body = { message: 'sync', content: b64 };
+    if (remoteSha) body.sha = remoteSha;
+    xhr.onload = function() {
+      if (xhr.status === 200 || xhr.status === 201) {
+        try { remoteSha = JSON.parse(xhr.responseText).content.sha; } catch(e) {}
+        syncStatus('已同步到云端');
+      } else if (xhr.status === 409) {
+        syncStatus('版本冲突，正在重新拉取…');
+        pullFromGitHub(function() { pushToGitHub(); });
+      } else {
+        syncStatus('上传失败 (' + xhr.status + ')');
+      }
+    };
+    xhr.onerror = function() { syncStatus('网络错误'); };
+    xhr.send(JSON.stringify(body));
+  }
+
+  function schedulePush() {
+    if (!getToken()) return;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(function() { pushToGitHub(); }, 3000);
+  }
+
+  // --- Local storage ---
   function loadIndex() { try { return JSON.parse(localStorage.getItem(INDEX_KEY)) || []; } catch(e) { return []; } }
   function saveIndex(idx) { try { localStorage.setItem(INDEX_KEY, JSON.stringify(idx)); } catch(e) {} }
 
   function loadState(id) { try { return JSON.parse(localStorage.getItem('lv-' + id)) || {}; } catch(e) { return {}; } }
-  function persistState() { if (!currentId) return; try { localStorage.setItem('lv-' + currentId, JSON.stringify(state)); } catch(e) {} updateIndex(); }
+  function persistState() {
+    if (!currentId) return;
+    try { localStorage.setItem('lv-' + currentId, JSON.stringify(state)); } catch(e) {}
+    updateIndex();
+    schedulePush();
+  }
 
   function updateIndex() {
     var idx = loadIndex();
@@ -497,6 +558,7 @@
           saveIndex(filtered);
           try { localStorage.removeItem('lv-' + item.id); } catch(e) {}
           renderPropertyList();
+          schedulePush();
         };
 
         li.appendChild(info); li.appendChild(score); li.appendChild(del);
@@ -511,6 +573,7 @@
     idx.push({ id: id, name: '未命名房源', rent: '', recommend: '', avg: '' });
     saveIndex(idx);
     openProperty(id);
+    schedulePush();
   };
 
   // --- Form page ---
@@ -685,66 +748,34 @@
     a.click(); URL.revokeObjectURL(a.href);
   };
 
-  // --- Sync ---
-  document.getElementById('syncBtn').onclick = function() {
-    if (!currentId) return;
-    var exportData = {};
-    for (var k in state) { if (state.hasOwnProperty(k)) exportData[k] = state[k]; }
-    var json = JSON.stringify(exportData);
-    var encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
-    var url = window.location.origin + window.location.pathname + '#sync=' + encoded;
-    var box = document.getElementById('syncLinkBox');
-    box.value = url;
-    document.getElementById('syncOverlay').className = 'sync-overlay show';
-  };
-  document.getElementById('syncCopyBtn').onclick = function() {
-    var box = document.getElementById('syncLinkBox');
-    box.select(); box.setSelectionRange(0, 99999);
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(box.value).then(function() { flash('已复制到剪贴板'); });
-      } else {
-        document.execCommand('copy'); flash('已复制到剪贴板');
-      }
-    } catch(e) { flash('请手动长按复制'); }
-  };
-  document.getElementById('syncCloseBtn').onclick = function() {
-    document.getElementById('syncOverlay').className = 'sync-overlay';
-  };
-  document.getElementById('syncOverlay').onclick = function(e) {
-    if (e.target === this) this.className = 'sync-overlay';
-  };
+  // --- Pull on visibility change (user switches back to tab) ---
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && getToken()) {
+      pullFromGitHub(function(updated) {
+        if (updated) {
+          if (currentId) { state = loadState(currentId); clearForm(); applyState(); renderFocus(); drawCustom(); }
+          else renderPropertyList();
+        }
+      });
+    }
+  }, false);
 
-  function importSync(encoded) {
-    try {
-      var json = decodeURIComponent(escape(atob(decodeURIComponent(encoded))));
-      var data = JSON.parse(json);
-      if (!data || typeof data !== 'object') return false;
-      var id = 'p' + Date.now();
-      var idx = loadIndex();
-      idx.push({ id: id, name: data.address || '同步导入的房源', rent: data.rent || '', recommend: data.recommend || '', avg: '' });
-      saveIndex(idx);
-      try { localStorage.setItem('lv-' + id, JSON.stringify(data)); } catch(e) {}
-      return id;
-    } catch(e) { return false; }
-  }
-
-  // --- Router: check hash on load ---
+  // --- Router ---
   function route() {
     var hash = window.location.hash;
 
-    var syncMatch = hash.match(/sync=(.+)/);
-    if (syncMatch) {
-      var importedId = importSync(syncMatch[1]);
-      if (importedId) {
-        window.location.hash = 'id=' + importedId;
-        flash('已导入同步数据');
-        openProperty(importedId);
-        return;
-      } else {
-        window.location.hash = '';
-        flash('同步数据解析失败');
-      }
+    var tokenMatch = hash.match(/token=([^&]+)/);
+    if (tokenMatch) {
+      ghToken = tokenMatch[1];
+      try { localStorage.setItem('gh-sync-token', ghToken); } catch(e) {}
+      window.location.hash = '';
+      flash('同步已激活');
+      syncStatus('同步已激活');
+      pullFromGitHub(function(updated) {
+        if (updated) renderPropertyList();
+      });
+      showHome();
+      return;
     }
 
     var match = hash.match(/id=([^&]+)/);
@@ -757,8 +788,17 @@
     }
     showHome();
   }
+
+  // --- Init: pull from GitHub then route ---
+  if (getToken()) {
+    pullFromGitHub(function(updated) {
+      route();
+    });
+  } else {
+    syncStatus('未启用云同步');
+    route();
+  }
   window.addEventListener('hashchange', route, false);
-  route();
 })();
 </script>
 </body>
