@@ -280,8 +280,9 @@
     <div class="section-title">特别关注（点击选中，可增删）</div>
     <div class="card">
       <div class="focus-list" id="focusList"></div>
+      <div id="focusItems"></div>
       <div class="focus-add-row">
-        <input id="focusInput" type="text" placeholder="输入新的关注点…">
+        <input id="focusInput" type="text" placeholder="输入新的关注点，回车添加…">
         <button id="focusAdd" type="button">添加</button>
       </div>
     </div>
@@ -378,7 +379,7 @@
   var API_BASE = 'https://api.github.com/repos/' + REPO + '/contents/' + SYNC_FILE;
   var RAW_URL = 'https://raw.githubusercontent.com/' + REPO + '/main/' + SYNC_FILE;
   var defaultFocus = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
-  var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动'];
+  var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动','窗户双层玻璃（double glazing）','手机信号强度（现场实测，可备注运营商）','厨具类型（燃气灶 / 电磁炉）','抽油烟机（有无、功率、是否适合中式爆炒）','能效等级 EPC','暖气类型（gas central heating / electric storage heater）','宽带是否自带（房东是否提供已装宽带）'];
 
   var homePage = document.getElementById('homePage');
   var formPage = document.getElementById('formPage');
@@ -625,6 +626,7 @@
 
   // --- Focus tags ---
   var focusListEl = document.getElementById('focusList');
+  var focusItemsEl = document.getElementById('focusItems');
   function renderFocus() {
     focusListEl.innerHTML = '';
     for (var i = 0; i < state.focusTags.length; i++) {
@@ -640,15 +642,41 @@
         focusListEl.appendChild(el);
       })(state.focusTags[i], i);
     }
+    renderFocusItems();
   }
-  document.getElementById('focusAdd').onclick = function() {
+  function renderFocusItems() {
+    focusItemsEl.innerHTML = '';
+    if (!state.focusItems) state.focusItems = [];
+    for (var i = 0; i < state.focusItems.length; i++) {
+      (function(idx) {
+        var item = state.focusItems[idx];
+        var row = document.createElement('div');
+        row.className = 'ci';
+        row.style.marginTop = '8px';
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!item.checked;
+        cb.onchange = function() { state.focusItems[idx].checked = cb.checked; persistState(); };
+        var label = document.createElement('label'); label.className = 'ci-label'; label.textContent = item.text;
+        var ta = document.createElement('textarea'); ta.placeholder = '备注'; ta.value = item.note || '';
+        ta.oninput = function() { state.focusItems[idx].note = ta.value; persistState(); };
+        var delBtn = document.createElement('button'); delBtn.className = 'ci-del'; delBtn.type = 'button'; delBtn.textContent = '删除此项';
+        delBtn.onclick = function() { state.focusItems.splice(idx, 1); persistState(); renderFocusItems(); flash('已删除'); };
+        row.appendChild(cb); row.appendChild(label); row.appendChild(ta); row.appendChild(delBtn);
+        focusItemsEl.appendChild(row);
+      })(i);
+    }
+  }
+  function addFocusItem() {
     var input = document.getElementById('focusInput');
     var val = input.value.replace(/^\s+|\s+$/g, '');
     if (!val) return;
-    var exists = false;
-    for (var i = 0; i < state.focusTags.length; i++) { if (state.focusTags[i] === val) { exists = true; break; } }
-    if (!exists) { state.focusTags.push(val); state.focusActive[val] = true; persistState(); renderFocus(); }
+    if (!state.focusItems) state.focusItems = [];
+    state.focusItems.push({ text: val, note: '', checked: false });
+    persistState(); renderFocusItems();
     input.value = ''; flash('已添加');
+  }
+  document.getElementById('focusAdd').onclick = addFocusItem;
+  document.getElementById('focusInput').onkeydown = function(e) {
+    if (e.keyCode === 13) { e.preventDefault(); addFocusItem(); }
   };
 
   // --- State apply/save ---
@@ -740,7 +768,7 @@
   // --- Clear ---
   document.getElementById('clearBtn').onclick = function() {
     if (!confirm('确定清空这条记录的所有内容吗？')) return;
-    state = { focusTags: defaultFocus.slice(), focusActive: {} }; photos = {};
+    state = { focusTags: defaultFocus.slice(), focusActive: {}, focusItems: [] }; photos = {};
     persistState(); clearForm(); renderFocus(); drawCustom(); flash('已清空');
   };
 
@@ -753,6 +781,7 @@
     for (var j = 0; j < cids.length; j++) { var ck = cids[j]; if (state[ck]) { var cl = '- ' + (state[ck + '-label'] || '未命名'); if (state[ck + '-n']) cl += '：' + state[ck + '-n']; checked.push(cl); } }
     var focusStr = [];
     for (var f = 0; f < state.focusTags.length; f++) { if (state.focusActive[state.focusTags[f]]) focusStr.push(state.focusTags[f]); }
+    if (state.focusItems) { for (var fi = 0; fi < state.focusItems.length; fi++) { var fItem = state.focusItems[fi]; var fLine = '- ' + fItem.text; if (fItem.note) fLine += '：' + fItem.note; if (fItem.checked) checked.push(fLine); else focusStr.push(fItem.text); } }
     var avgEl = document.getElementById('avgScore');
     var report = '伦敦代看房现场报告\n\n房源：' + g('address') + '\n时间：' + g('time') + '\n中介：' + g('agent') + '\n租金：' + g('rent') + '\n链接：' + g('link') + '\n\n特别关注：' + (focusStr.join('、') || '—') + '\n\n已检查项目：\n' + (checked.join('\n') || '—') + '\n\n评分\n房屋本身：' + g('score-property') + '/10\n居住舒适度：' + g('score-comfort') + '/10\n家具家电：' + g('score-appliances') + '/10\n楼栋与物业：' + g('score-building') + '/10\n区域与通勤：' + g('score-area') + '/10\n性价比：' + g('score-value') + '/10\n平均分：' + (avgEl.textContent || '—') + '\n是否推荐：' + g('recommend') + '\n\n核心优点：\n' + g('pros') + '\n\n需要注意：\n' + g('cons') + '\n\n建议与下一步：\n' + g('next');
     var blob = new Blob([report], {type: 'text/plain;charset=utf-8'});
