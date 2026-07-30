@@ -748,17 +748,24 @@
     a.click(); URL.revokeObjectURL(a.href);
   };
 
-  // --- Pull on visibility change (user switches back to tab) ---
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && getToken()) {
-      pullFromGitHub(function(updated) {
-        if (updated) {
-          if (currentId) { state = loadState(currentId); clearForm(); applyState(); renderFocus(); drawCustom(); }
-          else renderPropertyList();
-        }
-      });
+  // --- Auto-pull: visibility change + periodic polling ---
+  function refreshUI(updated) {
+    if (updated) {
+      if (currentId) { state = loadState(currentId); clearForm(); applyState(); renderFocus(); drawCustom(); }
+      else renderPropertyList();
     }
+  }
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && getToken()) pullFromGitHub(refreshUI);
   }, false);
+
+  var pollInterval = null;
+  function startPolling() {
+    if (pollInterval) return;
+    pollInterval = setInterval(function() {
+      if (getToken() && !document.hidden) pullFromGitHub(refreshUI);
+    }, 15000);
+  }
 
   // --- Router ---
   function route() {
@@ -771,6 +778,7 @@
       window.location.hash = '';
       flash('同步已激活');
       syncStatus('同步已激活');
+      startPolling();
       pullFromGitHub(function(updated) {
         if (updated) renderPropertyList();
       });
@@ -793,6 +801,7 @@
   if (getToken()) {
     pullFromGitHub(function(updated) {
       route();
+      startPolling();
     });
   } else {
     syncStatus('未启用云同步');
