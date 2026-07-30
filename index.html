@@ -658,9 +658,15 @@
         var label = document.createElement('label'); label.className = 'ci-label'; label.textContent = item.text;
         var ta = document.createElement('textarea'); ta.placeholder = '备注'; ta.value = item.note || '';
         ta.oninput = function() { state.focusItems[idx].note = ta.value; persistState(); };
+        var photoKey = 'fi' + idx;
+        var photoLabel = document.createElement('label'); photoLabel.className = 'photo-btn'; photoLabel.textContent = '拍照';
+        var photoInput = document.createElement('input'); photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.setAttribute('capture', 'environment'); photoInput.multiple = true;
+        photoInput.setAttribute('data-photo', photoKey);
+        photoLabel.appendChild(photoInput);
+        var gallery = document.createElement('div'); gallery.className = 'photo-gallery'; gallery.setAttribute('data-gallery', photoKey);
         var delBtn = document.createElement('button'); delBtn.className = 'ci-del'; delBtn.type = 'button'; delBtn.textContent = '删除此项';
         delBtn.onclick = function() { state.focusItems.splice(idx, 1); persistState(); renderFocusItems(); flash('已删除'); };
-        row.appendChild(cb); row.appendChild(label); row.appendChild(ta); row.appendChild(delBtn);
+        row.appendChild(cb); row.appendChild(label); row.appendChild(ta); row.appendChild(photoLabel); row.appendChild(gallery); row.appendChild(delBtn);
         focusItemsEl.appendChild(row);
       })(i);
     }
