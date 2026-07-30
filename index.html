@@ -419,9 +419,10 @@
     if (!token) { if (cb) cb(false); return; }
     syncStatus('同步中…');
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', API_BASE, true);
+    xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
     xhr.setRequestHeader('Authorization', 'token ' + token);
     xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+    xhr.setRequestHeader('Cache-Control', 'no-cache');
     xhr.onload = function() {
       if (xhr.status === 200) {
         try {
@@ -429,9 +430,11 @@
           remoteSha = resp.sha;
           var content = decodeURIComponent(escape(atob(resp.content.replace(/\s/g, ''))));
           var remote = JSON.parse(content);
-          var local = getAllData();
-          if (remote.ts && (!local.ts || remote.ts > local.ts)) {
+          var localTs = 0;
+          try { localTs = Number(localStorage.getItem('lv-last-sync-ts')) || 0; } catch(e) {}
+          if (remote.ts && remote.ts > localTs) {
             applyAllData(remote);
+            try { localStorage.setItem('lv-last-sync-ts', String(remote.ts)); } catch(e) {}
             syncStatus('已从云端同步');
             if (cb) cb(true);
             return;
@@ -467,6 +470,7 @@
     xhr.onload = function() {
       if (xhr.status === 200 || xhr.status === 201) {
         try { remoteSha = JSON.parse(xhr.responseText).content.sha; } catch(e) {}
+        try { localStorage.setItem('lv-last-sync-ts', String(data.ts)); } catch(e) {}
         syncStatus('已同步到云端');
       } else if (xhr.status === 409) {
         syncStatus('版本冲突，正在重新拉取…');
