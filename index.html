@@ -368,6 +368,7 @@
   var REPO = 'jyichen96-evcc/london-checklist';
   var SYNC_FILE = '_sync/data.json';
   var API_BASE = 'https://api.github.com/repos/' + REPO + '/contents/' + SYNC_FILE;
+  var RAW_URL = 'https://raw.githubusercontent.com/' + REPO + '/main/' + SYNC_FILE;
   var defaultFocus = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
   var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动'];
 
@@ -378,7 +379,6 @@
   var currentId = null;
   var state = {};
   var photos = {};
-  var remoteSha = null;
   var pushTimer = null;
   var ghToken = null;
 
@@ -414,22 +414,14 @@
     }
   }
 
-  function pullFromGitHub(cb) {
-    var token = getToken();
-    if (!token) { if (cb) cb(false); return; }
+  function pullFromCloud(cb) {
     syncStatus('同步中…');
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
-    xhr.setRequestHeader('Authorization', 'token ' + token);
-    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
-    xhr.setRequestHeader('Cache-Control', 'no-cache');
+    xhr.open('GET', RAW_URL + '?t=' + Date.now(), true);
     xhr.onload = function() {
       if (xhr.status === 200) {
         try {
-          var resp = JSON.parse(xhr.responseText);
-          remoteSha = resp.sha;
-          var content = decodeURIComponent(escape(atob(resp.content.replace(/\s/g, ''))));
-          var remote = JSON.parse(content);
+          var remote = JSON.parse(xhr.responseText);
           var localTs = 0;
           try { localTs = Number(localStorage.getItem('lv-last-sync-ts')) || 0; } catch(e) {}
           if (remote.ts && remote.ts > localTs) {
@@ -442,7 +434,6 @@
           syncStatus('数据已是最新');
         } catch(e) { syncStatus('同步解析失败'); }
       } else if (xhr.status === 404) {
-        remoteSha = null;
         syncStatus('云端无数据');
       } else {
         syncStatus('同步失败 (' + xhr.status + ')');
@@ -453,34 +444,48 @@
     xhr.send();
   }
 
+  function fetchSha(cb) {
+    var token = getToken();
+    if (!token) { cb(null); return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
+    xhr.setRequestHeader('Authorization', 'token ' + token);
+    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try { cb(JSON.parse(xhr.responseText).sha); } catch(e) { cb(null); }
+      } else { cb(null); }
+    };
+    xhr.onerror = function() { cb(null); };
+    xhr.send();
+  }
+
   function pushToGitHub() {
     var token = getToken();
     if (!token) return;
-    var data = getAllData();
-    var json = JSON.stringify(data);
-    var b64 = btoa(unescape(encodeURIComponent(json)));
     syncStatus('正在上传…');
-    var xhr = new XMLHttpRequest();
-    xhr.open('PUT', API_BASE, true);
-    xhr.setRequestHeader('Authorization', 'token ' + token);
-    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    var body = { message: 'sync', content: b64 };
-    if (remoteSha) body.sha = remoteSha;
-    xhr.onload = function() {
-      if (xhr.status === 200 || xhr.status === 201) {
-        try { remoteSha = JSON.parse(xhr.responseText).content.sha; } catch(e) {}
-        try { localStorage.setItem('lv-last-sync-ts', String(data.ts)); } catch(e) {}
-        syncStatus('已同步到云端');
-      } else if (xhr.status === 409) {
-        syncStatus('版本冲突，正在重新拉取…');
-        pullFromGitHub(function() { pushToGitHub(); });
-      } else {
-        syncStatus('上传失败 (' + xhr.status + ')');
-      }
-    };
-    xhr.onerror = function() { syncStatus('网络错误'); };
-    xhr.send(JSON.stringify(body));
+    fetchSha(function(sha) {
+      var data = getAllData();
+      var json = JSON.stringify(data);
+      var b64 = btoa(unescape(encodeURIComponent(json)));
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', API_BASE, true);
+      xhr.setRequestHeader('Authorization', 'token ' + token);
+      xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      var body = { message: 'sync', content: b64 };
+      if (sha) body.sha = sha;
+      xhr.onload = function() {
+        if (xhr.status === 200 || xhr.status === 201) {
+          try { localStorage.setItem('lv-last-sync-ts', String(data.ts)); } catch(e) {}
+          syncStatus('已同步到云端');
+        } else {
+          syncStatus('上传失败 (' + xhr.status + ')');
+        }
+      };
+      xhr.onerror = function() { syncStatus('网络错误'); };
+      xhr.send(JSON.stringify(body));
+    });
   }
 
   function schedulePush() {
@@ -760,14 +765,14 @@
     }
   }
   document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && getToken()) pullFromGitHub(refreshUI);
+    if (!document.hidden) pullFromCloud(refreshUI);
   }, false);
 
   var pollInterval = null;
   function startPolling() {
     if (pollInterval) return;
     pollInterval = setInterval(function() {
-      if (getToken() && !document.hidden) pullFromGitHub(refreshUI);
+      if (!document.hidden) pullFromCloud(refreshUI);
     }, 15000);
   }
 
@@ -783,7 +788,7 @@
       flash('同步已激活');
       syncStatus('同步已激活');
       startPolling();
-      pullFromGitHub(function(updated) {
+      pullFromCloud(function(updated) {
         if (updated) renderPropertyList();
       });
       showHome();
@@ -801,16 +806,11 @@
     showHome();
   }
 
-  // --- Init: pull from GitHub then route ---
-  if (getToken()) {
-    pullFromGitHub(function(updated) {
-      route();
-      startPolling();
-    });
-  } else {
-    syncStatus('未启用云同步');
+  // --- Init: always pull from cloud then route ---
+  pullFromCloud(function(updated) {
     route();
-  }
+    startPolling();
+  });
   window.addEventListener('hashchange', route, false);
 })();
 </script>
