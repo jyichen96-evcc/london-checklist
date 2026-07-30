@@ -473,6 +473,8 @@
     fetchSha(function(sha) {
       var data = getAllData();
       var json = JSON.stringify(data);
+      var sizeMB = (json.length / 1048576).toFixed(1);
+      syncStatus('正在上传（' + sizeMB + 'MB）…');
       var b64 = btoa(unescape(encodeURIComponent(json)));
       var xhr = new XMLHttpRequest();
       xhr.open('PUT', API_BASE, true);
@@ -506,7 +508,13 @@
   function loadState(id) { try { return JSON.parse(localStorage.getItem('lv-' + id)) || {}; } catch(e) { return {}; } }
   function persistState() {
     if (!currentId) return;
-    try { localStorage.setItem('lv-' + currentId, JSON.stringify(state)); } catch(e) {}
+    try {
+      localStorage.setItem('lv-' + currentId, JSON.stringify(state));
+    } catch(e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        syncStatus('存储空间不足，照片过多');
+      }
+    }
     updateIndex();
     schedulePush();
   }
@@ -662,7 +670,7 @@
         ta.oninput = function() { state.focusItems[idx].note = ta.value; persistState(); };
         var photoKey = 'fi' + idx;
         var photoLabel = document.createElement('label'); photoLabel.className = 'photo-btn'; photoLabel.textContent = '拍照';
-        var photoInput = document.createElement('input'); photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.setAttribute('capture', 'environment'); photoInput.multiple = true;
+        var photoInput = document.createElement('input'); photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.multiple = true;
         photoInput.setAttribute('data-photo', photoKey);
         photoLabel.appendChild(photoInput);
         var gallery = document.createElement('div'); gallery.className = 'photo-gallery'; gallery.setAttribute('data-gallery', photoKey);
@@ -731,7 +739,7 @@
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
       var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(canvas.toDataURL('image/jpeg', 0.7));
+      cb(canvas.toDataURL('image/jpeg', 0.5));
     };
     img.src = dataUrl;
   }
@@ -760,7 +768,7 @@
       (function(file) {
         var reader = new FileReader();
         reader.onload = function() {
-          resizeImage(reader.result, 1200, function(compressed) {
+          resizeImage(reader.result, 800, function(compressed) {
             photos[pk].push(compressed);
             savePhotos();
             renderPhotos(pk);
