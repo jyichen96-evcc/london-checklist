@@ -778,21 +778,117 @@
     persistState(); clearForm(); renderFocus(); drawCustom(); flash('已清空');
   };
 
-  // --- Export ---
+  // --- Export as HTML ---
+  function esc(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
+  function photoHtml(key) {
+    var arr = photos[key] || [];
+    if (arr.length === 0) return '';
+    var h = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0;">';
+    for (var p = 0; p < arr.length; p++) h += '<img src="' + arr[p] + '" style="max-width:280px;max-height:210px;border-radius:6px;border:1px solid #ddd;">';
+    return h + '</div>';
+  }
   document.getElementById('exportBtn').onclick = function() {
-    var g = function(k) { return state[k] || '—'; };
-    var checked = [];
-    for (var i = 0; i < itemLabels.length; i++) { var key = 'c' + i; if (state[key]) { var line = '- ' + itemLabels[i]; if (state[key + '-n']) line += '：' + state[key + '-n']; checked.push(line); } }
-    var cids = getCustomIds();
-    for (var j = 0; j < cids.length; j++) { var ck = cids[j]; if (state[ck]) { var cl = '- ' + (state[ck + '-label'] || '未命名'); if (state[ck + '-n']) cl += '：' + state[ck + '-n']; checked.push(cl); } }
+    var g = function(k) { return state[k] || ''; };
+    var avgEl = document.getElementById('avgScore');
+
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    html += '<title>看房报告 - ' + esc(g('address') || '未命名') + '</title>';
+    html += '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;max-width:800px;margin:0 auto;padding:20px;color:#222;background:#fff}';
+    html += 'h1{font-size:22px;color:#2d5a9e;margin-bottom:4px}h2{font-size:16px;color:#2d5a9e;margin:24px 0 8px;padding-bottom:4px;border-bottom:2px solid #e8eff8}';
+    html += '.info{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:8px 0}.info b{white-space:nowrap}';
+    html += '.tags span{display:inline-block;padding:3px 10px;margin:2px 4px 2px 0;border-radius:14px;font-size:13px;background:#2d5a9e;color:#fff}';
+    html += 'table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#2d5a9e;color:#fff;padding:8px;text-align:left;font-size:13px}';
+    html += 'td{padding:8px;border-bottom:1px solid #eee;font-size:13px;vertical-align:top}tr:nth-child(even){background:#f8f9fb}';
+    html += '.check{color:#3a7d34;font-weight:bold}.score-t td:last-child{text-align:center;font-weight:600}.score-t tr:last-child{background:#e8eff8;font-weight:700}';
+    html += '.note-box{background:#f8f9fb;border-radius:8px;padding:12px 16px;margin:6px 0;white-space:pre-wrap;line-height:1.6}';
+    html += '</style></head><body>';
+
+    html += '<h1>看房报告</h1><p style="color:#888;font-size:13px;margin-bottom:16px">' + esc(g('address') || '未命名房源') + '</p>';
+
+    html += '<h2>房源信息</h2><div class="info">';
+    html += '<b>房源名称</b><span>' + esc(g('address') || '—') + '</span>';
+    html += '<b>看房时间</b><span>' + esc(g('time') || '—') + '</span>';
+    html += '<b>中介</b><span>' + esc(g('agent') || '—') + '</span>';
+    html += '<b>租金</b><span>' + esc(g('rent') || '—') + '</span>';
+    if (g('link')) html += '<b>链接</b><span>' + esc(g('link')) + '</span>';
+    html += '</div>';
+
+    // Focus
     var focusStr = [];
     for (var f = 0; f < state.focusTags.length; f++) { if (state.focusActive[state.focusTags[f]]) focusStr.push(state.focusTags[f]); }
-    if (state.focusItems) { for (var fi = 0; fi < state.focusItems.length; fi++) { var fItem = state.focusItems[fi]; var fLine = '- ' + fItem.text; if (fItem.note) fLine += '：' + fItem.note; if (fItem.checked) checked.push(fLine); else focusStr.push(fItem.text); } }
-    var avgEl = document.getElementById('avgScore');
-    var report = '伦敦代看房现场报告\n\n房源：' + g('address') + '\n时间：' + g('time') + '\n中介：' + g('agent') + '\n租金：' + g('rent') + '\n链接：' + g('link') + '\n\n特别关注：' + (focusStr.join('、') || '—') + '\n\n已检查项目：\n' + (checked.join('\n') || '—') + '\n\n评分\n房屋本身：' + g('score-property') + '/10\n居住舒适度：' + g('score-comfort') + '/10\n家具家电：' + g('score-appliances') + '/10\n楼栋与物业：' + g('score-building') + '/10\n区域与通勤：' + g('score-area') + '/10\n性价比：' + g('score-value') + '/10\n平均分：' + (avgEl.textContent || '—') + '\n是否推荐：' + g('recommend') + '\n\n核心优点：\n' + g('pros') + '\n\n需要注意：\n' + g('cons') + '\n\n建议与下一步：\n' + g('next');
-    var blob = new Blob([report], {type: 'text/plain;charset=utf-8'});
+    if (state.focusItems) { for (var fi = 0; fi < state.focusItems.length; fi++) { if (!state.focusItems[fi].checked) focusStr.push(state.focusItems[fi].text); } }
+    if (focusStr.length > 0) {
+      html += '<h2>特别关注</h2><div class="tags">';
+      for (var ft = 0; ft < focusStr.length; ft++) html += '<span>' + esc(focusStr[ft]) + '</span>';
+      html += '</div>';
+    }
+
+    // Focus items with notes
+    if (state.focusItems) {
+      var hasFocusNotes = false;
+      for (var fn = 0; fn < state.focusItems.length; fn++) { if (state.focusItems[fn].note) hasFocusNotes = true; }
+      if (hasFocusNotes) {
+        html += '<table><tr><th>关注点</th><th>备注</th></tr>';
+        for (var fn2 = 0; fn2 < state.focusItems.length; fn2++) {
+          var fi2 = state.focusItems[fn2];
+          if (fi2.note) html += '<tr><td>' + esc(fi2.text) + '</td><td>' + esc(fi2.note) + '</td></tr>';
+        }
+        html += '</table>';
+      }
+    }
+
+    // Checklist groups
+    var groups = [
+      { title: '采光、空间与环境', keys: [0,1,2,3,4,5,6,7,8,9,10,32,33] },
+      { title: '家具、家电与楼栋', keys: [11,12,13,14,15,16,17,18,19,20,21,34,35,36,37,38] },
+      { title: '租赁细节与周边', keys: [22,23,24,25,26,27,28,29,30,31] }
+    ];
+    for (var gi = 0; gi < groups.length; gi++) {
+      var grp = groups[gi]; var rows = '';
+      for (var ki = 0; ki < grp.keys.length; ki++) {
+        var idx = grp.keys[ki]; var key = 'c' + idx;
+        if (!state[key] && !state[key + '-n'] && !(photos[key] && photos[key].length)) continue;
+        rows += '<tr><td>' + (state[key] ? '<span class="check">✓</span> ' : '') + esc(itemLabels[idx]) + '</td>';
+        rows += '<td>' + esc(state[key + '-n'] || '') + photoHtml(key) + '</td></tr>';
+      }
+      // Custom items
+      if (gi === 2) {
+        var cids = getCustomIds();
+        for (var ci = 0; ci < cids.length; ci++) {
+          var ck = cids[ci];
+          if (!state[ck] && !state[ck + '-n'] && !(photos[ck] && photos[ck].length)) continue;
+          rows += '<tr><td>' + (state[ck] ? '<span class="check">✓</span> ' : '') + esc(state[ck + '-label'] || '未命名') + '</td>';
+          rows += '<td>' + esc(state[ck + '-n'] || '') + photoHtml(ck) + '</td></tr>';
+        }
+      }
+      if (rows) {
+        html += '<h2>' + esc(grp.title) + '</h2><table><tr><th>检查项目</th><th>备注 / 照片</th></tr>' + rows + '</table>';
+      }
+    }
+
+    // Scores
+    html += '<h2>评分</h2><table class="score-t"><tr><th>维度</th><th>分数</th></tr>';
+    var scoreNames = ['房屋本身','居住舒适度','家具家电','楼栋与物业','区域与通勤','性价比'];
+    var scoreKeys = ['score-property','score-comfort','score-appliances','score-building','score-area','score-value'];
+    for (var si = 0; si < scoreNames.length; si++) {
+      var sv = Number(state[scoreKeys[si]]); var svt = (sv >= 1 && sv <= 10) ? sv + ' / 10' : '—';
+      html += '<tr><td>' + esc(scoreNames[si]) + '</td><td>' + svt + '</td></tr>';
+    }
+    html += '<tr><td>平均分</td><td>' + (avgEl.textContent || '—') + ' / 10</td></tr></table>';
+
+    // Recommend
+    if (g('recommend')) html += '<p style="margin:12px 0;font-size:15px"><b>是否推荐：</b>' + esc(g('recommend')) + '</p>';
+
+    // Notes
+    if (g('pros')) html += '<h2>核心优点</h2><div class="note-box">' + esc(g('pros')) + '</div>';
+    if (g('cons')) html += '<h2>需要注意</h2><div class="note-box">' + esc(g('cons')) + '</div>';
+    if (g('next')) html += '<h2>建议与下一步</h2><div class="note-box">' + esc(g('next')) + '</div>';
+
+    html += '<p style="margin-top:32px;color:#bbb;font-size:11px;text-align:center">导出自伦敦看房清单</p></body></html>';
+
+    var blob = new Blob([html], {type: 'text/html;charset=utf-8'});
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = '看房报告-' + (g('address')).replace(/[\\/:*?"<>|]/g, '_') + '.txt';
+    a.download = '看房报告-' + esc(g('address') || '未命名').replace(/[\\/:*?"<>|]/g, '_') + '.html';
     a.click(); URL.revokeObjectURL(a.href);
   };
 
