@@ -420,6 +420,23 @@
     }
   }
 
+  function applyRemote(jsonStr, cb) {
+    try {
+      var remote = JSON.parse(jsonStr);
+      var localTs = 0;
+      try { localTs = Number(localStorage.getItem('lv-last-sync-ts')) || 0; } catch(e) {}
+      if (remote.ts && remote.ts > localTs) {
+        applyAllData(remote);
+        try { localStorage.setItem('lv-last-sync-ts', String(remote.ts)); } catch(e) {}
+        syncStatus('已从云端同步');
+        if (cb) cb(true);
+        return;
+      }
+      syncStatus('数据已是最新');
+    } catch(e) { syncStatus('同步解析失败'); }
+    if (cb) cb(false);
+  }
+
   function pullFromCloud(cb) {
     syncStatus('同步中…');
     var xhr = new XMLHttpRequest();
@@ -430,25 +447,27 @@
       if (xhr.status === 200) {
         try {
           var resp = JSON.parse(xhr.responseText);
-          var content = decodeURIComponent(escape(atob(resp.content.replace(/\s/g, ''))));
-          var remote = JSON.parse(content);
-          var localTs = 0;
-          try { localTs = Number(localStorage.getItem('lv-last-sync-ts')) || 0; } catch(e) {}
-          if (remote.ts && remote.ts > localTs) {
-            applyAllData(remote);
-            try { localStorage.setItem('lv-last-sync-ts', String(remote.ts)); } catch(e) {}
-            syncStatus('已从云端同步');
-            if (cb) cb(true);
-            return;
+          if (resp.content && resp.content.length > 0) {
+            var content = decodeURIComponent(escape(atob(resp.content.replace(/\s/g, ''))));
+            applyRemote(content, cb);
+          } else if (resp.download_url) {
+            var xhr2 = new XMLHttpRequest();
+            xhr2.open('GET', resp.download_url + '?t=' + Date.now(), true);
+            xhr2.onload = function() {
+              if (xhr2.status === 200) { applyRemote(xhr2.responseText, cb); }
+              else { syncStatus('下载失败 (' + xhr2.status + ')'); if (cb) cb(false); }
+            };
+            xhr2.onerror = function() { syncStatus('网络错误'); if (cb) cb(false); };
+            xhr2.send();
+          } else {
+            syncStatus('云端数据为空'); if (cb) cb(false);
           }
-          syncStatus('数据已是最新');
-        } catch(e) { syncStatus('同步解析失败'); }
+        } catch(e) { syncStatus('同步解析失败'); if (cb) cb(false); }
       } else if (xhr.status === 404) {
-        syncStatus('云端无数据');
+        syncStatus('云端无数据'); if (cb) cb(false);
       } else {
-        syncStatus('同步失败 (' + xhr.status + ')');
+        syncStatus('同步失败 (' + xhr.status + ')'); if (cb) cb(false);
       }
-      if (cb) cb(false);
     };
     xhr.onerror = function() { syncStatus('网络错误'); if (cb) cb(false); };
     xhr.send();
