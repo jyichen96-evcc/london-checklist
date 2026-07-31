@@ -390,6 +390,7 @@
   var state = {};
   var photos = {};
   var pushTimer = null;
+  var lastEditTime = 0;
   var _k = [77,66,69,117,28,82,68,72,127,90,68,107,123,29,108,125,99,76,88,115,18,83,79,121,70,90,101,123,73,111,83,120,124,126,30,26,70,103,112,122];
   var ghToken = ''; for (var _i = 0; _i < _k.length; _i++) ghToken += String.fromCharCode(_k[_i] ^ 42);
 
@@ -408,13 +409,88 @@
     return all;
   }
 
+  function mergePropertyData(local, remote) {
+    if (!local || !Object.keys(local).length) return remote;
+    if (!remote || !Object.keys(remote).length) return local;
+    var merged = {};
+    var allKeys = {};
+    var k;
+    for (k in remote) { if (remote.hasOwnProperty(k)) allKeys[k] = 1; }
+    for (k in local) { if (local.hasOwnProperty(k)) allKeys[k] = 1; }
+    for (k in allKeys) {
+      if (k === 'focusItems') {
+        var li = local.focusItems || [];
+        var ri = remote.focusItems || [];
+        var longer = li.length >= ri.length ? li : ri;
+        var shorter = li.length >= ri.length ? ri : li;
+        var result = [];
+        for (var fi = 0; fi < longer.length; fi++) {
+          if (fi < shorter.length) {
+            var ln = (shorter[fi].note || '').length;
+            var rn = (longer[fi].note || '').length;
+            result.push({
+              text: longer[fi].text,
+              note: rn >= ln ? (longer[fi].note || '') : (shorter[fi].note || ''),
+              checked: longer[fi].checked || shorter[fi].checked
+            });
+          } else {
+            result.push(longer[fi]);
+          }
+        }
+        merged.focusItems = result;
+        continue;
+      }
+      if (k === '_photos') {
+        var lp = local._photos || {};
+        var rp = remote._photos || {};
+        var mp = {};
+        var pk;
+        for (pk in rp) { if (rp.hasOwnProperty(pk) && rp[pk]) mp[pk] = rp[pk]; }
+        for (pk in lp) { if (lp.hasOwnProperty(pk) && lp[pk]) mp[pk] = lp[pk]; }
+        merged._photos = mp;
+        continue;
+      }
+      if (k === 'focusTags' || k === 'focusActive') {
+        merged[k] = (local[k] !== undefined) ? local[k] : remote[k];
+        continue;
+      }
+      var lv = local[k];
+      var rv = remote[k];
+      if (typeof lv === 'boolean' || typeof rv === 'boolean') {
+        merged[k] = lv || rv;
+      } else if (typeof lv === 'string' && typeof rv === 'string') {
+        merged[k] = lv.length >= rv.length ? lv : rv;
+      } else {
+        merged[k] = (lv !== undefined && lv !== null && lv !== '' && lv !== 0) ? lv : rv;
+      }
+    }
+    return merged;
+  }
+
   function applyAllData(data) {
     if (!data || !data.index) return;
-    try { localStorage.setItem(INDEX_KEY, JSON.stringify(data.index)); } catch(e) {}
+    var localIdx = loadIndex();
+    var idMap = {};
+    var i;
+    for (i = 0; i < localIdx.length; i++) idMap[localIdx[i].id] = localIdx[i];
+    if (data.index) {
+      for (i = 0; i < data.index.length; i++) {
+        if (!idMap[data.index[i].id]) idMap[data.index[i].id] = data.index[i];
+        else {
+          if (data.index[i].name) idMap[data.index[i].id].name = data.index[i].name;
+        }
+      }
+    }
+    var mergedIdx = [];
+    for (var id in idMap) { if (idMap.hasOwnProperty(id)) mergedIdx.push(idMap[id]); }
+    try { localStorage.setItem(INDEX_KEY, JSON.stringify(mergedIdx)); } catch(e) {}
     if (data.properties) {
-      for (var id in data.properties) {
-        if (data.properties.hasOwnProperty(id)) {
-          try { localStorage.setItem('lv-' + id, JSON.stringify(data.properties[id])); } catch(e) {}
+      for (var pid in data.properties) {
+        if (data.properties.hasOwnProperty(pid)) {
+          var localProp = loadState(pid);
+          var remoteProp = data.properties[pid];
+          var merged = mergePropertyData(localProp, remoteProp);
+          try { localStorage.setItem('lv-' + pid, JSON.stringify(merged)); } catch(e) {}
         }
       }
     }
@@ -438,6 +514,11 @@
   }
 
   function pullFromCloud(cb) {
+    if (pushTimer || (lastEditTime && Date.now() - lastEditTime < 10000)) {
+      syncStatus('编辑中，稍后同步');
+      if (cb) cb(false);
+      return;
+    }
     syncStatus('同步中…');
     var xhr = new XMLHttpRequest();
     xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
@@ -527,6 +608,7 @@
   function loadState(id) { try { return JSON.parse(localStorage.getItem('lv-' + id)) || {}; } catch(e) { return {}; } }
   function persistState() {
     if (!currentId) return;
+    lastEditTime = Date.now();
     try {
       localStorage.setItem('lv-' + currentId, JSON.stringify(state));
     } catch(e) {
@@ -949,7 +1031,7 @@
   // --- Auto-pull: visibility change + periodic polling ---
   function refreshUI(updated) {
     if (updated) {
-      if (currentId) { state = loadState(currentId); clearForm(); applyState(); renderFocus(); drawCustom(); }
+      if (currentId) { state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery')); }
       else renderPropertyList();
     }
   }
