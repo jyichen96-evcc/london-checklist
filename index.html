@@ -653,6 +653,10 @@
 
   // --- Home page ---
   function showHome() {
+    if (currentId) {
+      saveAll();
+      if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; pushToGitHub(); }
+    }
     currentId = null; state = {}; photos = {};
     homePage.className = 'page active';
     formPage.className = 'page';
