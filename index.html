@@ -537,27 +537,10 @@
     var xhr = new XMLHttpRequest();
     xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
     xhr.setRequestHeader('Authorization', 'token ' + ghToken);
-    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+    xhr.setRequestHeader('Accept', 'application/vnd.github.v3.raw');
     xhr.onload = function() {
       if (xhr.status === 200) {
-        try {
-          var resp = JSON.parse(xhr.responseText);
-          if (resp.content && resp.content.length > 0) {
-            var content = decodeURIComponent(escape(atob(resp.content.replace(/\s/g, ''))));
-            applyRemote(content, cb);
-          } else if (resp.download_url) {
-            var xhr2 = new XMLHttpRequest();
-            xhr2.open('GET', resp.download_url + '?t=' + Date.now(), true);
-            xhr2.onload = function() {
-              if (xhr2.status === 200) { applyRemote(xhr2.responseText, cb); }
-              else { syncStatus('下载失败 (' + xhr2.status + ')'); if (cb) cb(false); }
-            };
-            xhr2.onerror = function() { syncStatus('网络错误'); if (cb) cb(false); };
-            xhr2.send();
-          } else {
-            syncStatus('云端数据为空'); if (cb) cb(false);
-          }
-        } catch(e) { syncStatus('同步解析失败'); if (cb) cb(false); }
+        applyRemote(xhr.responseText, cb);
       } else if (xhr.status === 404) {
         syncStatus('云端无数据'); if (cb) cb(false);
       } else {
