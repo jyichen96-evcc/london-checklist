@@ -1062,6 +1062,32 @@
     showHome();
   }
 
+  window.addEventListener('beforeunload', function() {
+    if (pushTimer || lastEditTime > 0) {
+      if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+      try {
+        var sx = new XMLHttpRequest();
+        sx.open('GET', API_BASE + '?t=' + Date.now(), false);
+        sx.setRequestHeader('Authorization', 'token ' + ghToken);
+        sx.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+        sx.send();
+        var sha = null;
+        if (sx.status === 200) { try { sha = JSON.parse(sx.responseText).sha; } catch(e) {} }
+        var data = getAllData();
+        var json = JSON.stringify(data);
+        var b64 = btoa(unescape(encodeURIComponent(json)));
+        var px = new XMLHttpRequest();
+        px.open('PUT', API_BASE, false);
+        px.setRequestHeader('Authorization', 'token ' + ghToken);
+        px.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+        px.setRequestHeader('Content-Type', 'application/json');
+        var body = { message: 'sync', content: b64 };
+        if (sha) body.sha = sha;
+        px.send(JSON.stringify(body));
+      } catch(e) {}
+    }
+  }, false);
+
   // --- Init: always pull from cloud then route ---
   pullFromCloud(function(updated) {
     route();
