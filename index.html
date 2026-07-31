@@ -171,6 +171,19 @@
       border: none; background: none; color: #c44; font-size: 13px;
       cursor: pointer; padding: 2px 0;
     }
+    .ci .ci-hide-btn {
+      grid-column: 2; justify-self: end;
+      border: none; background: none; color: #bbb; font-size: 12px;
+      cursor: pointer; padding: 2px 6px;
+    }
+    .ci .ci-hide-btn:active { color: #c44; }
+    .restore-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin-top: 8px; padding: 6px 12px;
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      background: #fff; color: #888;
+      font: inherit; font-size: 13px; cursor: pointer;
+    }
     .add-btn {
       display: inline-flex; align-items: center; gap: 4px;
       margin-top: 10px; padding: 8px 14px;
@@ -336,6 +349,7 @@
       <div class="ci"><input type="checkbox" id="c30" data-save="c30"><label class="ci-label" for="c30">外卖、快递、收件便利</label><textarea data-save="c30-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c30"></label><div class="photo-gallery" data-gallery="c30"></div></div>
       <div class="ci"><input type="checkbox" id="c31" data-save="c31"><label class="ci-label" for="c31">附近施工、酒吧或大型活动</label><textarea data-save="c31-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c31"></label><div class="photo-gallery" data-gallery="c31"></div></div>
     </div>
+    <button class="restore-btn" id="restoreHidden" type="button" style="display:none;">恢复已删除的检查项</button>
   </div>
 
   <div class="section">
@@ -715,6 +729,7 @@
     applyState();
     renderFocus();
     drawCustom();
+    initHideButtons();
     var galleries = document.querySelectorAll('[data-gallery]');
     for (var gi = 0; gi < galleries.length; gi++) { renderPhotos(galleries[gi].getAttribute('data-gallery')); }
     window.scrollTo(0, 0);
@@ -731,6 +746,8 @@
     var galleries = document.querySelectorAll('.photo-gallery');
     for (var g = 0; g < galleries.length; g++) galleries[g].innerHTML = '';
     document.getElementById('avgScore').textContent = '–';
+    var allCi = document.querySelectorAll('.ci');
+    for (var ci = 0; ci < allCi.length; ci++) allCi[ci].style.display = '';
   }
 
   document.getElementById('backBtn').onclick = showHome;
@@ -831,6 +848,64 @@
     }
   }, false);
   document.addEventListener('change', function(e) { if (e.target.getAttribute('data-save')) saveAll(); }, false);
+
+  // --- Hide/restore fixed checklist items ---
+  function initHideButtons() {
+    if (!state.hiddenItems) state.hiddenItems = [];
+    var ciEls = document.querySelectorAll('.ci[class="ci"]');
+    for (var i = 0; i < ciEls.length; i++) {
+      var ci = ciEls[i];
+      var cb = ci.querySelector('input[type="checkbox"][data-save]');
+      if (!cb) continue;
+      var existing = ci.querySelector('.ci-hide-btn');
+      if (existing) continue;
+      (function(el, key) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ci-hide-btn';
+        btn.textContent = '删除此项';
+        btn.onclick = function() {
+          if (!state.hiddenItems) state.hiddenItems = [];
+          if (state.hiddenItems.indexOf(key) < 0) state.hiddenItems.push(key);
+          el.style.display = 'none';
+          persistState();
+          updateRestoreBtn();
+          flash('已隐藏');
+        };
+        el.appendChild(btn);
+      })(ci, cb.getAttribute('data-save'));
+    }
+    applyHidden();
+    updateRestoreBtn();
+  }
+  function applyHidden() {
+    var hidden = (state.hiddenItems || []);
+    for (var h = 0; h < hidden.length; h++) {
+      var el = document.getElementById(hidden[h]);
+      if (el && el.parentNode) el.parentNode.style.display = 'none';
+    }
+  }
+  function updateRestoreBtn() {
+    var btn = document.getElementById('restoreHidden');
+    var count = (state.hiddenItems || []).length;
+    if (count > 0) {
+      btn.style.display = '';
+      btn.textContent = '恢复已删除的检查项（' + count + '项）';
+    } else {
+      btn.style.display = 'none';
+    }
+  }
+  document.getElementById('restoreHidden').onclick = function() {
+    var hidden = state.hiddenItems || [];
+    for (var h = 0; h < hidden.length; h++) {
+      var el = document.getElementById(hidden[h]);
+      if (el && el.parentNode) el.parentNode.style.display = '';
+    }
+    state.hiddenItems = [];
+    persistState();
+    updateRestoreBtn();
+    flash('已恢复全部');
+  };
 
   // --- Photos ---
   function resizeImage(dataUrl, maxW, cb) {
@@ -1031,7 +1106,7 @@
   // --- Auto-pull: visibility change + periodic polling ---
   function refreshUI(updated) {
     if (updated) {
-      if (currentId) { state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery')); }
+      if (currentId) { state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery')); }
       else renderPropertyList();
     }
   }
