@@ -500,9 +500,15 @@
     for (i = 0; i < localIdx.length; i++) idMap[localIdx[i].id] = localIdx[i];
     if (data.index) {
       for (i = 0; i < data.index.length; i++) {
-        if (!idMap[data.index[i].id]) { idMap[data.index[i].id] = data.index[i]; changed = true; }
+        var ri = data.index[i];
+        if (!idMap[ri.id]) { idMap[ri.id] = ri; changed = true; }
         else {
-          if (data.index[i].name && data.index[i].name !== idMap[data.index[i].id].name) { idMap[data.index[i].id].name = data.index[i].name; changed = true; }
+          var li = idMap[ri.id];
+          var fields = ['name','rent','recommend','avg'];
+          for (var fi = 0; fi < fields.length; fi++) {
+            var f = fields[fi];
+            if (ri[f] && ri[f] !== li[f]) { li[f] = ri[f]; changed = true; }
+          }
         }
       }
     }
