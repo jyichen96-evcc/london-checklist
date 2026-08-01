@@ -566,6 +566,24 @@
   }
 
   function pushToGitHub() {
+    syncStatus('正在拉取合并…');
+    var pxhr = new XMLHttpRequest();
+    pxhr.open('GET', API_BASE + '?t=' + Date.now(), true);
+    pxhr.setRequestHeader('Authorization', 'token ' + ghToken);
+    pxhr.setRequestHeader('Accept', 'application/vnd.github.v3.raw');
+    pxhr.onload = function() {
+      if (pxhr.status === 200) {
+        try {
+          var remote = JSON.parse(pxhr.responseText);
+          applyAllData(remote);
+        } catch(e) {}
+      }
+      doActualPush();
+    };
+    pxhr.onerror = function() { doActualPush(); };
+    pxhr.send();
+  }
+  function doActualPush() {
     syncStatus('正在上传…');
     fetchSha(function(sha) {
       var data = getAllData();
