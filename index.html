@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
   <title>伦敦看房清单</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -482,16 +484,17 @@
   }
 
   function applyAllData(data) {
-    if (!data || !data.index) return;
+    if (!data || !data.index) return false;
+    var changed = false;
     var localIdx = loadIndex();
     var idMap = {};
     var i;
     for (i = 0; i < localIdx.length; i++) idMap[localIdx[i].id] = localIdx[i];
     if (data.index) {
       for (i = 0; i < data.index.length; i++) {
-        if (!idMap[data.index[i].id]) idMap[data.index[i].id] = data.index[i];
+        if (!idMap[data.index[i].id]) { idMap[data.index[i].id] = data.index[i]; changed = true; }
         else {
-          if (data.index[i].name) idMap[data.index[i].id].name = data.index[i].name;
+          if (data.index[i].name && data.index[i].name !== idMap[data.index[i].id].name) { idMap[data.index[i].id].name = data.index[i].name; changed = true; }
         }
       }
     }
@@ -503,28 +506,30 @@
         if (data.properties.hasOwnProperty(pid)) {
           var localProp = loadState(pid);
           var remoteProp = data.properties[pid];
+          var localStr = JSON.stringify(localProp);
           var merged = mergePropertyData(localProp, remoteProp);
-          try { localStorage.setItem('lv-' + pid, JSON.stringify(merged)); } catch(e) {}
+          var mergedStr = JSON.stringify(merged);
+          if (mergedStr !== localStr) { changed = true; }
+          try { localStorage.setItem('lv-' + pid, mergedStr); } catch(e) {}
         }
       }
     }
+    return changed;
   }
 
   function applyRemote(jsonStr, cb) {
     try {
       var remote = JSON.parse(jsonStr);
-      var localTs = 0;
-      try { localTs = Number(localStorage.getItem('lv-last-sync-ts')) || 0; } catch(e) {}
-      if (remote.ts && remote.ts > localTs) {
-        applyAllData(remote);
-        try { localStorage.setItem('lv-last-sync-ts', String(remote.ts)); } catch(e) {}
+      if (!remote || !remote.index) { syncStatus('云端数据为空'); if (cb) cb(false); return; }
+      var changed = applyAllData(remote);
+      if (changed) {
         syncStatus('已从云端同步');
         if (cb) cb(true);
-        return;
+      } else {
+        syncStatus('数据已是最新');
+        if (cb) cb(false);
       }
-      syncStatus('数据已是最新');
-    } catch(e) { syncStatus('同步解析失败'); }
-    if (cb) cb(false);
+    } catch(e) { syncStatus('同步解析失败'); if (cb) cb(false); }
   }
 
   function pullFromCloud(cb) {
