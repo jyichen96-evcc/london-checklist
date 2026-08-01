@@ -387,13 +387,18 @@
   <div id="syncStatus" style="margin-top:6px;font-size:12px;color:#888;min-height:16px;"></div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
 (function() {
+  // --- Firebase 配置 ---
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDiiXVV3J-L4e4HvDzZmZkW_GrJ7t98Xco",
+    databaseURL: "https://london-checklist-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "london-checklist"
+  };
+
   var INDEX_KEY = 'lv-index';
-  var REPO = 'jyichen96-evcc/london-checklist';
-  var SYNC_FILE = '_sync/data.json';
-  var API_BASE = 'https://api.github.com/repos/' + REPO + '/contents/' + SYNC_FILE;
-  var RAW_URL = 'https://raw.githubusercontent.com/' + REPO + '/main/' + SYNC_FILE;
   var defaultFocus = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
   var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动','窗户双层玻璃（double glazing）','手机信号强度（现场实测，可备注运营商）','厨具类型（燃气灶 / 电磁炉）','抽油烟机（有无、功率、是否适合中式爆炒）','能效等级 EPC','暖气类型（gas central heating / electric storage heater）','宽带是否自带（房东是否提供已装宽带）'];
 
@@ -407,13 +412,17 @@
   var photos = {};
   var pushTimer = null;
   var lastEditTime = 0;
-  var _k = [77,66,69,117,28,82,68,72,127,90,68,107,123,29,108,125,99,76,88,115,18,83,79,121,70,90,101,123,73,111,83,120,124,126,30,26,70,103,112,122];
-  var ghToken = ''; for (var _i = 0; _i < _k.length; _i++) ghToken += String.fromCharCode(_k[_i] ^ 42);
+
+  // Firebase init
+  var fb = firebase.initializeApp(FIREBASE_CONFIG);
+  var db = firebase.database();
+  var DATA_REF = db.ref('checklist');
+  var fbReady = FIREBASE_CONFIG.databaseURL !== 'PLACEHOLDER';
 
   function flash(msg) { toastEl.textContent = msg; setTimeout(function() { toastEl.textContent = ''; }, 1500); }
   function syncStatus(msg) { if (syncStatusEl) syncStatusEl.textContent = msg; if (homeSyncEl) homeSyncEl.textContent = msg; }
 
-  // --- GitHub sync ---
+  // --- Firebase sync ---
 
   function getAllData() {
     var idx = loadIndex();
@@ -421,7 +430,6 @@
     for (var i = 0; i < idx.length; i++) {
       all.properties[idx[i].id] = loadState(idx[i].id);
     }
-    all.ts = Date.now();
     return all;
   }
 
@@ -517,108 +525,52 @@
     return changed;
   }
 
-  function applyRemote(jsonStr, cb) {
-    try {
-      var remote = JSON.parse(jsonStr);
-      if (!remote || !remote.index) { syncStatus('云端数据为空'); if (cb) cb(false); return; }
-      var changed = applyAllData(remote);
-      if (changed) {
-        syncStatus('已从云端同步');
-        if (cb) cb(true);
-      } else {
-        syncStatus('数据已是最新');
-        if (cb) cb(false);
-      }
-    } catch(e) { syncStatus('同步解析失败'); if (cb) cb(false); }
-  }
-
-  function pullFromCloud(cb) {
-    if (pushTimer || (lastEditTime && Date.now() - lastEditTime < 10000)) {
-      syncStatus('编辑中，稍后同步');
-      if (cb) cb(false);
-      return;
-    }
-    syncStatus('同步中…');
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
-    xhr.setRequestHeader('Authorization', 'token ' + ghToken);
-    xhr.setRequestHeader('Accept', 'application/vnd.github.v3.raw');
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        applyRemote(xhr.responseText, cb);
-      } else if (xhr.status === 404) {
-        syncStatus('云端无数据'); if (cb) cb(false);
-      } else {
-        syncStatus('同步失败 (' + xhr.status + ')'); if (cb) cb(false);
-      }
-    };
-    xhr.onerror = function() { syncStatus('网络错误'); if (cb) cb(false); };
-    xhr.send();
-  }
-
-  function fetchSha(cb) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', API_BASE + '?t=' + Date.now(), true);
-    xhr.setRequestHeader('Authorization', 'token ' + ghToken);
-    xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        try { cb(JSON.parse(xhr.responseText).sha); } catch(e) { cb(null); }
-      } else { cb(null); }
-    };
-    xhr.onerror = function() { cb(null); };
-    xhr.send();
-  }
-
-  function pushToGitHub() {
-    syncStatus('正在拉取合并…');
-    var pxhr = new XMLHttpRequest();
-    pxhr.open('GET', API_BASE + '?t=' + Date.now(), true);
-    pxhr.setRequestHeader('Authorization', 'token ' + ghToken);
-    pxhr.setRequestHeader('Accept', 'application/vnd.github.v3.raw');
-    pxhr.onload = function() {
-      if (pxhr.status === 200) {
-        try {
-          var remote = JSON.parse(pxhr.responseText);
-          applyAllData(remote);
-        } catch(e) {}
-      }
-      doActualPush();
-    };
-    pxhr.onerror = function() { doActualPush(); };
-    pxhr.send();
-  }
-  function doActualPush() {
-    syncStatus('正在上传…');
-    fetchSha(function(sha) {
-      var data = getAllData();
-      var json = JSON.stringify(data);
-      var sizeMB = (json.length / 1048576).toFixed(1);
-      syncStatus('正在上传（' + sizeMB + 'MB）…');
-      var b64 = btoa(unescape(encodeURIComponent(json)));
-      var xhr = new XMLHttpRequest();
-      xhr.open('PUT', API_BASE, true);
-      xhr.setRequestHeader('Authorization', 'token ' + ghToken);
-      xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      var body = { message: 'sync', content: b64 };
-      if (sha) body.sha = sha;
-      xhr.onload = function() {
-        if (xhr.status === 200 || xhr.status === 201) {
-          try { localStorage.setItem('lv-last-sync-ts', String(data.ts)); } catch(e) {}
-          syncStatus('已同步到云端');
-        } else {
-          syncStatus('上传失败 (' + xhr.status + ')');
-        }
-      };
-      xhr.onerror = function() { syncStatus('网络错误'); };
-      xhr.send(JSON.stringify(body));
+  function pushToFirebase() {
+    if (!fbReady) return;
+    syncStatus('正在同步…');
+    pushTimer = null;
+    var data = getAllData();
+    DATA_REF.set(data).then(function() {
+      syncStatus('已同步');
+    }).catch(function(err) {
+      syncStatus('同步失败: ' + (err.message || err));
     });
   }
 
   function schedulePush() {
     if (pushTimer) clearTimeout(pushTimer);
-    pushTimer = setTimeout(function() { pushToGitHub(); }, 3000);
+    pushTimer = setTimeout(function() { pushToFirebase(); }, 2000);
+  }
+
+  var fbListenerActive = false;
+  var initialSyncDone = false;
+  function startFirebaseListener() {
+    if (!fbReady || fbListenerActive) return;
+    fbListenerActive = true;
+    DATA_REF.on('value', function(snapshot) {
+      var remote = snapshot.val();
+      if (!remote || !remote.index) {
+        if (!initialSyncDone) {
+          initialSyncDone = true;
+          var local = getAllData();
+          if (local.index && local.index.length > 0) {
+            DATA_REF.set(local).then(function() { syncStatus('本地数据已上传'); });
+          }
+        }
+        return;
+      }
+      initialSyncDone = true;
+      if (lastEditTime && Date.now() - lastEditTime < 3000) return;
+      var changed = applyAllData(remote);
+      if (changed) {
+        syncStatus('已同步');
+        refreshUI(true);
+      } else {
+        syncStatus('已连接');
+      }
+    }, function(err) {
+      syncStatus('连接失败: ' + (err.message || err));
+    });
   }
 
   // --- Local storage ---
@@ -661,7 +613,7 @@
   function showHome() {
     if (currentId) {
       saveAll();
-      if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; pushToGitHub(); }
+      if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; pushToFirebase(); }
     }
     currentId = null; state = {}; photos = {};
     homePage.className = 'page active';
@@ -1113,29 +1065,17 @@
     a.click(); URL.revokeObjectURL(a.href);
   };
 
-  // --- Auto-pull: visibility change + periodic polling ---
+  // --- UI refresh ---
   function refreshUI(updated) {
     if (updated) {
       if (currentId) { state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery')); }
       else renderPropertyList();
     }
   }
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) pullFromCloud(refreshUI);
-  }, false);
-
-  var pollInterval = null;
-  function startPolling() {
-    if (pollInterval) return;
-    pollInterval = setInterval(function() {
-      if (!document.hidden) pullFromCloud(refreshUI);
-    }, 15000);
-  }
 
   // --- Router ---
   function route() {
     var hash = window.location.hash;
-
     var match = hash.match(/id=([^&]+)/);
     if (match) {
       var id = match[1];
@@ -1148,36 +1088,23 @@
   }
 
   window.addEventListener('beforeunload', function() {
-    if (pushTimer || lastEditTime > 0) {
-      if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
-      try {
-        var sx = new XMLHttpRequest();
-        sx.open('GET', API_BASE + '?t=' + Date.now(), false);
-        sx.setRequestHeader('Authorization', 'token ' + ghToken);
-        sx.setRequestHeader('Accept', 'application/vnd.github.v3+json');
-        sx.send();
-        var sha = null;
-        if (sx.status === 200) { try { sha = JSON.parse(sx.responseText).sha; } catch(e) {} }
+    if (pushTimer) {
+      clearTimeout(pushTimer);
+      pushTimer = null;
+      if (fbReady) {
         var data = getAllData();
-        var json = JSON.stringify(data);
-        var b64 = btoa(unescape(encodeURIComponent(json)));
-        var px = new XMLHttpRequest();
-        px.open('PUT', API_BASE, false);
-        px.setRequestHeader('Authorization', 'token ' + ghToken);
-        px.setRequestHeader('Accept', 'application/vnd.github.v3+json');
-        px.setRequestHeader('Content-Type', 'application/json');
-        var body = { message: 'sync', content: b64 };
-        if (sha) body.sha = sha;
-        px.send(JSON.stringify(body));
-      } catch(e) {}
+        navigator.sendBeacon && navigator.sendBeacon('about:blank');
+        DATA_REF.set(data);
+      }
     }
   }, false);
 
-  // --- Init: always pull from cloud then route ---
-  pullFromCloud(function(updated) {
-    route();
-    startPolling();
-  });
+  // --- Init ---
+  if (!fbReady) {
+    syncStatus('请配置 Firebase（见说明）');
+  }
+  route();
+  startFirebaseListener();
   window.addEventListener('hashchange', route, false);
 })();
 </script>
