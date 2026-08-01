@@ -559,13 +559,24 @@
         }
         return;
       }
+      var wasInitial = !initialSyncDone;
       initialSyncDone = true;
       if (lastEditTime && Date.now() - lastEditTime < 3000) return;
       var changed = applyAllData(remote);
       if (changed) {
         syncStatus('已同步');
         refreshUI(true);
-      } else {
+      }
+      if (wasInitial) {
+        var merged = getAllData();
+        var mergedStr = JSON.stringify(merged);
+        var remoteStr = JSON.stringify(remote);
+        if (mergedStr !== remoteStr) {
+          DATA_REF.set(merged).then(function() { syncStatus('数据已合并上传'); });
+        } else {
+          syncStatus('已连接');
+        }
+      } else if (!changed) {
         syncStatus('已连接');
       }
     }, function(err) {
