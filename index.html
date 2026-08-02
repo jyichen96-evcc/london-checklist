@@ -194,6 +194,34 @@
       font: inherit; font-size: 14px; cursor: pointer;
     }
 
+    /* Todo */
+    .todo-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .todo-add-row input[type="text"] {
+      flex: 1; min-width: 120px; border: 1px solid #d0d0d0; border-radius: 8px;
+      padding: 8px 10px; font: inherit; font-size: 14px; background: #fff; color: #1d1d1f;
+    }
+    .todo-add-row input[type="date"] {
+      border: 1px solid #d0d0d0; border-radius: 8px;
+      padding: 8px 10px; font: inherit; font-size: 14px; background: #fff; color: #1d1d1f;
+    }
+    .todo-add-row button {
+      border: 1px solid #2d5a9e; border-radius: 8px; padding: 8px 14px;
+      font: inherit; font-size: 14px; background: #2d5a9e; color: #fff; cursor: pointer;
+      white-space: nowrap;
+    }
+    .todo-add-row input:focus { outline: none; border-color: #2d5a9e; }
+    .todo-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 0; border-bottom: 1px solid #eee;
+    }
+    .todo-item:last-child { border-bottom: none; }
+    .todo-item.done .todo-text { text-decoration: line-through; color: #aaa; }
+    .todo-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: #2d5a9e; flex-shrink: 0; }
+    .todo-text { flex: 1; font-size: 14px; min-width: 0; }
+    .todo-date { font-size: 12px; color: #888; white-space: nowrap; }
+    .todo-cal { border: none; background: none; font-size: 14px; cursor: pointer; padding: 2px; color: #2d5a9e; }
+    .todo-del { border: none; background: none; font-size: 14px; cursor: pointer; padding: 2px; color: #c44; }
+
     /* Scores */
     .score-row {
       display: flex; align-items: center; gap: 10px;
@@ -254,6 +282,10 @@
       .actions, .section-title { border-color: #333; }
       .ci input[type="checkbox"] { accent-color: #6b9fe8; }
       .new-property-btn { border-color: #444; color: #888; }
+      .todo-add-row input { background: #1a1a18; color: #e0ddd8; border-color: #444; }
+      .todo-add-row button { background: #6b9fe8; border-color: #6b9fe8; color: #111; }
+      .todo-item { border-color: #333; }
+      .todo-cal { color: #6b9fe8; }
     }
   </style>
 </head>
@@ -363,6 +395,18 @@
     <div class="card">
       <div id="customItems"></div>
       <button class="add-btn" id="addCustom" type="button">+ 添加检查项</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">待办跟进（不会导出）</div>
+    <div class="card">
+      <div id="todoList"></div>
+      <div class="todo-add-row">
+        <input id="todoInput" type="text" placeholder="打电话给中介、确认起租日…">
+        <input id="todoDate" type="date">
+        <button id="todoAdd" type="button">添加</button>
+      </div>
     </div>
   </div>
 
@@ -715,6 +759,7 @@
     initHideButtons();
     var galleries = document.querySelectorAll('[data-gallery]');
     for (var gi = 0; gi < galleries.length; gi++) { renderPhotos(galleries[gi].getAttribute('data-gallery')); }
+    renderTodos();
     window.scrollTo(0, 0);
   }
 
@@ -965,11 +1010,69 @@
     delete photos[dk]; persistState(); drawCustom(); flash('已删除');
   }, false);
 
+  // --- Todo ---
+  function getTodos() { return state.todos || []; }
+  function renderTodos() {
+    var box = document.getElementById('todoList');
+    if (!box) return;
+    box.innerHTML = '';
+    var todos = getTodos();
+    for (var i = 0; i < todos.length; i++) {
+      (function(idx, t) {
+        var div = document.createElement('div');
+        div.className = 'todo-item' + (t.done ? ' done' : '');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = !!t.done;
+        cb.onchange = function() { state.todos[idx].done = cb.checked; persistState(); renderTodos(); };
+        var txt = document.createElement('span');
+        txt.className = 'todo-text'; txt.textContent = t.text;
+        div.appendChild(cb); div.appendChild(txt);
+        if (t.date) {
+          var dt = document.createElement('span');
+          dt.className = 'todo-date'; dt.textContent = t.date;
+          div.appendChild(dt);
+          var cal = document.createElement('button');
+          cal.type = 'button'; cal.className = 'todo-cal'; cal.textContent = '+cal';
+          cal.title = '添加到日历';
+          cal.onclick = function() {
+            var d = t.date.replace(/-/g, '');
+            var ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART;VALUE=DATE:' + d +
+              '\nSUMMARY:' + t.text + (state.address ? ' (' + state.address + ')' : '') +
+              '\nEND:VEVENT\nEND:VCALENDAR';
+            var blob = new Blob([ics], {type: 'text/calendar'});
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); a.download = 'event.ics'; a.click();
+            URL.revokeObjectURL(a.href);
+          };
+          div.appendChild(cal);
+        }
+        var del = document.createElement('button');
+        del.type = 'button'; del.className = 'todo-del'; del.textContent = '×';
+        del.onclick = function() { state.todos.splice(idx, 1); persistState(); renderTodos(); };
+        div.appendChild(del);
+        box.appendChild(div);
+      })(i, todos[i]);
+    }
+  }
+  document.getElementById('todoAdd').onclick = function() {
+    var input = document.getElementById('todoInput');
+    var dateInput = document.getElementById('todoDate');
+    var text = input.value.trim();
+    if (!text) return;
+    if (!state.todos) state.todos = [];
+    state.todos.push({ text: text, date: dateInput.value || '', done: false });
+    input.value = ''; dateInput.value = '';
+    persistState(); renderTodos();
+  };
+  document.getElementById('todoInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('todoAdd').click();
+  }, false);
+
   // --- Clear ---
   document.getElementById('clearBtn').onclick = function() {
     if (!confirm('确定清空这条记录的所有内容吗？')) return;
-    state = { focusTags: defaultFocus.slice(), focusActive: {}, focusItems: [], _photos: {} }; photos = {};
-    persistState(); clearForm(); renderFocus(); drawCustom(); flash('已清空');
+    state = { focusTags: defaultFocus.slice(), focusActive: {}, focusItems: [], _photos: {}, todos: [] }; photos = {};
+    persistState(); clearForm(); renderFocus(); drawCustom(); renderTodos(); flash('已清空');
   };
 
   // --- Export as HTML ---
@@ -1033,8 +1136,8 @@
 
     // Checklist groups
     var groups = [
-      { title: '采光、空间与环境', keys: [0,1,2,3,4,5,6,7,8,9,10,32,33] },
-      { title: '家具、家电与楼栋', keys: [11,12,13,14,15,16,17,18,19,20,21,34,35,36,37,38] },
+      { title: '采光、空间与环境', keys: [0,1,39,2,3,4,5,6,7,8,9,10,32,33] },
+      { title: '家具、家电与楼栋', keys: [11,12,13,40,14,41,42,15,16,17,18,19,20,21,34,35,36,37,38] },
       { title: '租赁细节与周边', keys: [22,23,24,25,26,27,28,29,30,31] }
     ];
     for (var gi = 0; gi < groups.length; gi++) {
@@ -1089,7 +1192,7 @@
   // --- UI refresh ---
   function refreshUI(updated) {
     if (updated) {
-      if (currentId) { state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery')); }
+      if (currentId) { state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery')); renderTodos(); }
       else renderPropertyList();
     }
   }
