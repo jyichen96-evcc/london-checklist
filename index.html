@@ -752,7 +752,9 @@
     currentId = id;
     state = loadState(id);
     photos = state._photos || {};
-    if (!state.focusTags) state.focusTags = defaultFocus.slice();
+    var oldDefaults = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
+    if (!state.focusTags) state.focusTags = [];
+    if (JSON.stringify(state.focusTags) === JSON.stringify(oldDefaults)) { state.focusTags = []; state.focusActive = {}; }
     if (!state.focusActive) state.focusActive = {};
 
     homePage.className = 'page';
