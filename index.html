@@ -657,7 +657,8 @@
       localStorage.setItem('lv-' + currentId, JSON.stringify(state));
     } catch(e) {
       if (e.name === 'QuotaExceededError' || e.code === 22) {
-        syncStatus('存储空间不足，照片过多');
+        syncStatus('存储空间不足');
+        alert('手机存储空间不足，部分数据可能未保存。建议删除不需要的照片后重试。');
       }
     }
     updateIndex();
@@ -683,6 +684,10 @@
 
   // --- Home page ---
   function showHome() {
+    if (pendingPhotos > 0) {
+      alert('照片还在处理中，请稍等几秒再返回');
+      return;
+    }
     if (currentId) {
       saveAll();
       if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; pushToFirebase(); }
@@ -875,6 +880,7 @@
   function saveAll() {
     var els = document.querySelectorAll('[data-save]');
     for (var i = 0; i < els.length; i++) { var el = els[i]; state[el.getAttribute('data-save')] = el.type === 'checkbox' ? el.checked : el.value; }
+    state._photos = photos;
     persistState(); updateAvg(); flash('已自动保存');
   }
 
@@ -973,18 +979,23 @@
       })(i);
     }
   }
+  var pendingPhotos = 0;
   document.addEventListener('change', function(e) {
     var pk = e.target.getAttribute('data-photo'); if (!pk) return;
     if (!photos[pk]) photos[pk] = [];
     var files = e.target.files;
     for (var i = 0; i < files.length; i++) {
       (function(file) {
+        pendingPhotos++;
+        flash('正在处理照片…');
         var reader = new FileReader();
         reader.onload = function() {
           resizeImage(reader.result, 800, function(compressed) {
             photos[pk].push(compressed);
             savePhotos();
             renderPhotos(pk);
+            pendingPhotos--;
+            if (pendingPhotos === 0) flash('照片已保存');
           });
         };
         reader.readAsDataURL(file);
