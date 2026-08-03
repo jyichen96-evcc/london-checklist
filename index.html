@@ -398,6 +398,13 @@
       <div class="ci"><input type="checkbox" id="c29" data-save="c29"><label class="ci-label" for="c29">夜间照明与安全感</label><textarea data-save="c29-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c29"></label><div class="photo-gallery" data-gallery="c29"></div></div>
       <div class="ci"><input type="checkbox" id="c30" data-save="c30"><label class="ci-label" for="c30">外卖、快递、收件便利</label><textarea data-save="c30-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c30"></label><div class="photo-gallery" data-gallery="c30"></div></div>
       <div class="ci"><input type="checkbox" id="c31" data-save="c31"><label class="ci-label" for="c31">附近施工、酒吧或大型活动</label><textarea data-save="c31-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c31"></label><div class="photo-gallery" data-gallery="c31"></div></div>
+      <div class="group-title">睡眠质量评估</div>
+      <div class="ci"><input type="checkbox" id="c43" data-save="c43"><label class="ci-label" for="c43">卧室夜间噪音（马路、邻居、管道）</label><textarea data-save="c43-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c43"></label><div class="photo-gallery" data-gallery="c43"></div></div>
+      <div class="ci"><input type="checkbox" id="c44" data-save="c44"><label class="ci-label" for="c44">遮光条件（窗帘、百叶窗、外部光源）</label><textarea data-save="c44-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c44"></label><div class="photo-gallery" data-gallery="c44"></div></div>
+      <div class="ci"><input type="checkbox" id="c45" data-save="c45"><label class="ci-label" for="c45">卧室通风与温控（窗户可开、暖气位置）</label><textarea data-save="c45-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c45"></label><div class="photo-gallery" data-gallery="c45"></div></div>
+      <div class="ci"><input type="checkbox" id="c46" data-save="c46"><label class="ci-label" for="c46">床垫与床架状况</label><textarea data-save="c46-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c46"></label><div class="photo-gallery" data-gallery="c46"></div></div>
+      <div class="ci"><input type="checkbox" id="c47" data-save="c47"><label class="ci-label" for="c47">卧室朝向与早晨阳光</label><textarea data-save="c47-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c47"></label><div class="photo-gallery" data-gallery="c47"></div></div>
+      <div class="ci"><input type="checkbox" id="c48" data-save="c48"><label class="ci-label" for="c48">卧室面积与床的摆放空间</label><textarea data-save="c48-n" placeholder="备注"></textarea><label class="photo-btn">拍照<input type="file" accept="image/*" multiple data-photo="c48"></label><div class="photo-gallery" data-gallery="c48"></div></div>
     </div>
     <button class="restore-btn" id="restoreHidden" type="button" style="display:none;">恢复已删除的检查项</button>
   </div>
@@ -418,6 +425,7 @@
       <div class="score-row"><span class="score-label">家具家电</span><input class="score-input" data-save="score-appliances" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
       <div class="score-row"><span class="score-label">楼栋与物业</span><input class="score-input" data-save="score-building" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
       <div class="score-row"><span class="score-label">区域与通勤</span><input class="score-input" data-save="score-area" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
+      <div class="score-row"><span class="score-label">睡眠质量</span><input class="score-input" data-save="score-sleep" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
       <div class="score-row"><span class="score-label">性价比</span><input class="score-input" data-save="score-value" type="range" min="0" max="10" value="0"><span class="score-val">–</span></div>
       <div class="avg-box"><span class="avg-num" id="avgScore">–</span><span class="avg-label">/ 10 平均分</span></div>
       <div class="field" style="margin-top:14px"><span class="field-label">是否推荐</span><select data-save="recommend"><option value="">请选择</option><option value="推荐">推荐</option><option value="可考虑">可考虑</option><option value="不建议">不建议</option></select></div>
@@ -447,8 +455,8 @@
   };
 
   var INDEX_KEY = 'lv-index';
-  var defaultFocus = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
-  var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动','窗户双层玻璃（double glazing）','手机信号强度（现场实测，可备注运营商）','厨具类型（燃气灶 / 电磁炉）','抽油烟机（有无、功率、是否适合中式爆炒）','能效等级 EPC','暖气类型（gas central heating / electric storage heater）','宽带是否自带（房东是否提供已装宽带）','西晒情况','地毯 / 地面新旧程度','供暖覆盖范围','冷热水龙头是否分开'];
+  var defaultFocus = [];
+  var itemLabels = ['采光、日照与遮挡','窗户方向／朝向','房间尺度、布局与动线','储物空间','天花高度／压迫感','通风、可开窗情况','主路、铁路、施工噪音','邻居、走廊、电梯噪音','对望、楼距与隐私','墙角、窗边潮湿／霉斑','水渍、异味、渗漏迹象','家具清单与实际状况','冰箱／冷冻／烤箱／灶具','洗衣机／烘干机','热水、暖气与温控','水压与排水','网络供应商／信号','插座数量与位置','前台、快递、门禁','垃圾房、自行车位、公区','电梯数量与等候情况','物业维护与施工公告','租期、押金、起租日','Bills、Council Tax、网络','宠物、转租、提前解约规则','车站距离与实际步行路线','公交、地铁及通勤时间','超市、餐厅、健身房','公园与绿地','夜间照明与安全感','外卖、快递、收件便利','附近施工、酒吧或大型活动','窗户双层玻璃（double glazing）','手机信号强度（现场实测，可备注运营商）','厨具类型（燃气灶 / 电磁炉）','抽油烟机（有无、功率、是否适合中式爆炒）','能效等级 EPC','暖气类型（gas central heating / electric storage heater）','宽带是否自带（房东是否提供已装宽带）','西晒情况','地毯 / 地面新旧程度','供暖覆盖范围','冷热水龙头是否分开','卧室夜间噪音（马路、邻居、管道）','遮光条件（窗帘、百叶窗、外部光源）','卧室通风与温控（窗户可开、暖气位置）','床垫与床架状况','卧室朝向与早晨阳光','卧室面积与床的摆放空间'];
 
   var homePage = document.getElementById('homePage');
   var formPage = document.getElementById('formPage');
@@ -1138,7 +1146,8 @@
     var groups = [
       { title: '采光、空间与环境', keys: [0,1,39,2,3,4,5,6,7,8,9,10,32,33] },
       { title: '家具、家电与楼栋', keys: [11,12,13,40,14,41,42,15,16,17,18,19,20,21,34,35,36,37,38] },
-      { title: '租赁细节与周边', keys: [22,23,24,25,26,27,28,29,30,31] }
+      { title: '租赁细节与周边', keys: [22,23,24,25,26,27,28,29,30,31] },
+      { title: '睡眠质量评估', keys: [43,44,45,46,47,48] }
     ];
     for (var gi = 0; gi < groups.length; gi++) {
       var grp = groups[gi]; var rows = '';
