@@ -653,12 +653,17 @@
   function persistState() {
     if (!currentId) return;
     lastEditTime = Date.now();
+    var stateStr = JSON.stringify(state);
     try {
-      localStorage.setItem('lv-' + currentId, JSON.stringify(state));
+      localStorage.setItem('lv-' + currentId, stateStr);
     } catch(e) {
       if (e.name === 'QuotaExceededError' || e.code === 22) {
         syncStatus('存储空间不足');
-        alert('手机存储空间不足，部分数据可能未保存。建议删除不需要的照片后重试。');
+        var photoCount = 0;
+        var p = state._photos || {};
+        for (var pk in p) { if (p.hasOwnProperty(pk)) photoCount += (p[pk] || []).length; }
+        alert('存储空间不足（' + Math.round(stateStr.length / 1024) + 'KB, ' + photoCount + '张照片）。请删除部分照片后重试。');
+        return;
       }
     }
     updateIndex();
@@ -958,7 +963,7 @@
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
       var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(canvas.toDataURL('image/jpeg', 0.5));
+      cb(canvas.toDataURL('image/jpeg', 0.35));
     };
     img.src = dataUrl;
   }
@@ -990,7 +995,7 @@
         flash('正在处理照片…');
         var reader = new FileReader();
         reader.onload = function() {
-          resizeImage(reader.result, 800, function(compressed) {
+          resizeImage(reader.result, 600, function(compressed) {
             photos[pk].push(compressed);
             savePhotos();
             renderPhotos(pk);
