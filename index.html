@@ -694,7 +694,16 @@
       return;
     }
     if (currentId) {
+      state._photos = photos;
       saveAll();
+      var verify = loadState(currentId);
+      var savedCount = 0;
+      if (verify._photos) { for (var vk in verify._photos) { if (verify._photos.hasOwnProperty(vk)) savedCount += (verify._photos[vk] || []).length; } }
+      var memCount = 0;
+      for (var mk in photos) { if (photos.hasOwnProperty(mk)) memCount += (photos[mk] || []).length; }
+      if (memCount > 0 && savedCount === 0) {
+        alert('警告：' + memCount + '张照片未能保存到本地存储！');
+      }
       if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; pushToFirebase(); }
     }
     currentId = null; state = {}; photos = {};
