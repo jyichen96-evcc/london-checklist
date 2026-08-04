@@ -472,6 +472,7 @@
   var fb = firebase.initializeApp(FIREBASE_CONFIG);
   var db = firebase.database();
   var DATA_REF = db.ref('checklist');
+  var PHOTO_REF = db.ref('photos');
   var fbReady = FIREBASE_CONFIG.databaseURL !== 'PLACEHOLDER';
 
   function flash(msg) { toastEl.textContent = msg; setTimeout(function() { toastEl.textContent = ''; }, 1500); }
@@ -483,7 +484,9 @@
     var idx = loadIndex();
     var all = { index: idx, properties: {} };
     for (var i = 0; i < idx.length; i++) {
-      all.properties[idx[i].id] = loadState(idx[i].id);
+      var ps = loadState(idx[i].id);
+      delete ps._photos;
+      all.properties[idx[i].id] = ps;
     }
     return all;
   }
@@ -519,16 +522,7 @@
         merged.focusItems = result;
         continue;
       }
-      if (k === '_photos') {
-        var lp = local._photos || {};
-        var rp = remote._photos || {};
-        var mp = {};
-        var pk;
-        for (pk in rp) { if (rp.hasOwnProperty(pk) && rp[pk]) mp[pk] = rp[pk]; }
-        for (pk in lp) { if (lp.hasOwnProperty(pk) && lp[pk]) mp[pk] = lp[pk]; }
-        merged._photos = mp;
-        continue;
-      }
+      if (k === '_photos') continue;
       if (k === 'focusTags' || k === 'focusActive') {
         merged[k] = (local[k] !== undefined) ? local[k] : remote[k];
         continue;
@@ -620,6 +614,17 @@
         }
         return;
       }
+      if (remote.properties) {
+        var migrated = false;
+        for (var mid in remote.properties) {
+          if (remote.properties.hasOwnProperty(mid) && remote.properties[mid]._photos) {
+            PHOTO_REF.child(mid).set(remote.properties[mid]._photos);
+            delete remote.properties[mid]._photos;
+            migrated = true;
+          }
+        }
+        if (migrated) { DATA_REF.child('properties').set(remote.properties); }
+      }
       var wasInitial = !initialSyncDone;
       initialSyncDone = true;
       if (lastEditTime && Date.now() - lastEditTime < 3000) return;
@@ -653,17 +658,15 @@
   function persistState() {
     if (!currentId) return;
     lastEditTime = Date.now();
-    var stateStr = JSON.stringify(state);
+    var toSave = {};
+    for (var sk in state) {
+      if (state.hasOwnProperty(sk) && sk !== '_photos') toSave[sk] = state[sk];
+    }
     try {
-      localStorage.setItem('lv-' + currentId, stateStr);
+      localStorage.setItem('lv-' + currentId, JSON.stringify(toSave));
     } catch(e) {
       if (e.name === 'QuotaExceededError' || e.code === 22) {
         syncStatus('存储空间不足');
-        var photoCount = 0;
-        var p = state._photos || {};
-        for (var pk in p) { if (p.hasOwnProperty(pk)) photoCount += (p[pk] || []).length; }
-        alert('存储空间不足（' + Math.round(stateStr.length / 1024) + 'KB, ' + photoCount + '张照片）。请删除部分照片后重试。');
-        return;
       }
     }
     updateIndex();
@@ -694,16 +697,8 @@
       return;
     }
     if (currentId) {
-      state._photos = photos;
       saveAll();
-      var verify = loadState(currentId);
-      var savedCount = 0;
-      if (verify._photos) { for (var vk in verify._photos) { if (verify._photos.hasOwnProperty(vk)) savedCount += (verify._photos[vk] || []).length; } }
-      var memCount = 0;
-      for (var mk in photos) { if (photos.hasOwnProperty(mk)) memCount += (photos[mk] || []).length; }
-      if (memCount > 0 && savedCount === 0) {
-        alert('警告：' + memCount + '张照片未能保存到本地存储！');
-      }
+      if (fbReady) { PHOTO_REF.child(currentId).set(photos); }
       if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; pushToFirebase(); }
     }
     currentId = null; state = {}; photos = {};
@@ -771,6 +766,21 @@
     currentId = id;
     state = loadState(id);
     photos = state._photos || {};
+    if (fbReady) {
+      PHOTO_REF.child(id).once('value', function(snap) {
+        var fbPhotos = snap.val();
+        if (fbPhotos) {
+          for (var pk in fbPhotos) {
+            if (fbPhotos.hasOwnProperty(pk) && fbPhotos[pk]) {
+              if (!photos[pk] || photos[pk].length < fbPhotos[pk].length) photos[pk] = fbPhotos[pk];
+            }
+          }
+          state._photos = photos;
+          var galleries = document.querySelectorAll('[data-gallery]');
+          for (var gi = 0; gi < galleries.length; gi++) renderPhotos(galleries[gi].getAttribute('data-gallery'));
+        }
+      });
+    }
     var oldDefaults = ['采光/朝向','噪音','潮湿/发霉','家具家电','安全与门禁','交通通勤','周边生活','合同/租期'];
     if (!state.focusTags) state.focusTags = [];
     if (JSON.stringify(state.focusTags) === JSON.stringify(oldDefaults)) { state.focusTags = []; state.focusActive = {}; }
@@ -894,7 +904,6 @@
   function saveAll() {
     var els = document.querySelectorAll('[data-save]');
     for (var i = 0; i < els.length; i++) { var el = els[i]; state[el.getAttribute('data-save')] = el.type === 'checkbox' ? el.checked : el.value; }
-    state._photos = photos;
     persistState(); updateAvg(); flash('已自动保存');
   }
 
@@ -978,7 +987,13 @@
   }
   function savePhotos() {
     state._photos = photos;
-    persistState();
+    if (fbReady && currentId) {
+      PHOTO_REF.child(currentId).set(photos).then(function() {
+        flash('照片已保存');
+      }).catch(function(err) {
+        flash('照片保存失败');
+      });
+    }
   }
   function renderPhotos(key) {
     var gallery = document.querySelector('[data-gallery="' + key + '"]'); if (!gallery) return;
@@ -1227,7 +1242,16 @@
   // --- UI refresh ---
   function refreshUI(updated) {
     if (updated) {
-      if (currentId) { state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery')); renderTodos(); }
+      if (currentId) {
+        state = loadState(currentId); clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); renderTodos();
+        if (fbReady) {
+          PHOTO_REF.child(currentId).once('value', function(snap) {
+            var fbPhotos = snap.val();
+            if (fbPhotos) { photos = fbPhotos; state._photos = photos; }
+            var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery'));
+          });
+        }
+      }
       else renderPropertyList();
     }
   }
@@ -1259,6 +1283,19 @@
   }, false);
 
   // --- Init ---
+  (function cleanOldPhotos() {
+    var idx = loadIndex();
+    for (var ci = 0; ci < idx.length; ci++) {
+      var key = 'lv-' + idx[ci].id;
+      try {
+        var d = JSON.parse(localStorage.getItem(key) || '{}');
+        if (d._photos && Object.keys(d._photos).length > 0) {
+          delete d._photos;
+          localStorage.setItem(key, JSON.stringify(d));
+        }
+      } catch(e) {}
+    }
+  })();
   if (!fbReady) {
     syncStatus('请配置 Firebase（见说明）');
   }
