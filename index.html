@@ -679,6 +679,7 @@
         for (var nk in toSave) { if (toSave.hasOwnProperty(nk) && nk !== '_photos') noPhoto[nk] = toSave[nk]; }
         try { localStorage.setItem('lv-' + currentId, JSON.stringify(noPhoto)); } catch(e2) {}
         syncStatus('空间不足，照片仅存云端');
+        alert('本地存储空间不足，照片将只保存到云端。文字内容不受影响。');
       }
     }
     updateIndex();
