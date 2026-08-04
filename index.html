@@ -1302,20 +1302,18 @@
   }, false);
 
   // --- Init ---
-  (function cleanOldPhotos() {
-    var now = Date.now();
-    var threeDays = 3 * 24 * 60 * 60 * 1000;
+  (function migratePhotosToCloud() {
     var idx = loadIndex();
     for (var ci = 0; ci < idx.length; ci++) {
       var key = 'lv-' + idx[ci].id;
       try {
         var d = JSON.parse(localStorage.getItem(key) || '{}');
         if (!d._photos || !Object.keys(d._photos).length) continue;
-        var viewTime = d.time ? new Date(d.time).getTime() : 0;
-        if (viewTime && now - viewTime > threeDays) {
-          delete d._photos;
-          localStorage.setItem(key, JSON.stringify(d));
+        if (fbReady) {
+          PHOTO_REF.child(idx[ci].id).update(d._photos);
         }
+        delete d._photos;
+        localStorage.setItem(key, JSON.stringify(d));
       } catch(e) {}
     }
   })();
