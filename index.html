@@ -484,9 +484,7 @@
     var idx = loadIndex();
     var all = { index: idx, properties: {} };
     for (var i = 0; i < idx.length; i++) {
-      var ps = loadState(idx[i].id);
-      delete ps._photos;
-      all.properties[idx[i].id] = ps;
+      all.properties[idx[i].id] = loadState(idx[i].id);
     }
     return all;
   }
@@ -522,7 +520,16 @@
         merged.focusItems = result;
         continue;
       }
-      if (k === '_photos') continue;
+      if (k === '_photos') {
+        var lp = local._photos || {};
+        var rp = remote._photos || {};
+        var mp = {};
+        var pk;
+        for (pk in rp) { if (rp.hasOwnProperty(pk) && rp[pk]) mp[pk] = rp[pk]; }
+        for (pk in lp) { if (lp.hasOwnProperty(pk) && lp[pk]) mp[pk] = lp[pk]; }
+        merged._photos = mp;
+        continue;
+      }
       if (k === 'focusTags' || k === 'focusActive') {
         merged[k] = (local[k] !== undefined) ? local[k] : remote[k];
         continue;
@@ -660,13 +667,18 @@
     lastEditTime = Date.now();
     var toSave = {};
     for (var sk in state) {
-      if (state.hasOwnProperty(sk) && sk !== '_photos') toSave[sk] = state[sk];
+      if (state.hasOwnProperty(sk)) toSave[sk] = state[sk];
     }
+    toSave._photos = photos;
+    var stateStr = JSON.stringify(toSave);
     try {
-      localStorage.setItem('lv-' + currentId, JSON.stringify(toSave));
+      localStorage.setItem('lv-' + currentId, stateStr);
     } catch(e) {
       if (e.name === 'QuotaExceededError' || e.code === 22) {
-        syncStatus('存储空间不足');
+        var noPhoto = {};
+        for (var nk in toSave) { if (toSave.hasOwnProperty(nk) && nk !== '_photos') noPhoto[nk] = toSave[nk]; }
+        try { localStorage.setItem('lv-' + currentId, JSON.stringify(noPhoto)); } catch(e2) {}
+        syncStatus('空间不足，照片仅存云端');
       }
     }
     updateIndex();
@@ -770,14 +782,17 @@
       PHOTO_REF.child(id).once('value', function(snap) {
         var fbPhotos = snap.val();
         if (fbPhotos) {
+          var changed = false;
           for (var pk in fbPhotos) {
             if (fbPhotos.hasOwnProperty(pk) && fbPhotos[pk]) {
-              if (!photos[pk] || photos[pk].length < fbPhotos[pk].length) photos[pk] = fbPhotos[pk];
+              if (!photos[pk] || photos[pk].length < fbPhotos[pk].length) { photos[pk] = fbPhotos[pk]; changed = true; }
             }
           }
-          state._photos = photos;
-          var galleries = document.querySelectorAll('[data-gallery]');
-          for (var gi = 0; gi < galleries.length; gi++) renderPhotos(galleries[gi].getAttribute('data-gallery'));
+          if (changed) {
+            state._photos = photos;
+            var galleries = document.querySelectorAll('[data-gallery]');
+            for (var gi = 0; gi < galleries.length; gi++) renderPhotos(galleries[gi].getAttribute('data-gallery'));
+          }
         }
       });
     }
@@ -987,11 +1002,12 @@
   }
   function savePhotos() {
     state._photos = photos;
+    persistState();
     if (fbReady && currentId) {
       PHOTO_REF.child(currentId).set(photos).then(function() {
         flash('照片已保存');
       }).catch(function(err) {
-        flash('照片保存失败');
+        flash('照片仅存本地');
       });
     }
   }
@@ -1243,12 +1259,16 @@
   function refreshUI(updated) {
     if (updated) {
       if (currentId) {
-        state = loadState(currentId); clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); renderTodos();
+        state = loadState(currentId); photos = state._photos || {}; clearForm(); applyState(); renderFocus(); drawCustom(); initHideButtons(); renderTodos();
+        var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery'));
         if (fbReady) {
           PHOTO_REF.child(currentId).once('value', function(snap) {
             var fbPhotos = snap.val();
-            if (fbPhotos) { photos = fbPhotos; state._photos = photos; }
-            var gs = document.querySelectorAll('[data-gallery]'); for (var gi = 0; gi < gs.length; gi++) renderPhotos(gs[gi].getAttribute('data-gallery'));
+            if (fbPhotos) {
+              var changed = false;
+              for (var rpk in fbPhotos) { if (fbPhotos.hasOwnProperty(rpk) && fbPhotos[rpk] && (!photos[rpk] || photos[rpk].length < fbPhotos[rpk].length)) { photos[rpk] = fbPhotos[rpk]; changed = true; } }
+              if (changed) { state._photos = photos; var gs2 = document.querySelectorAll('[data-gallery]'); for (var gi2 = 0; gi2 < gs2.length; gi2++) renderPhotos(gs2[gi2].getAttribute('data-gallery')); }
+            }
           });
         }
       }
@@ -1284,12 +1304,16 @@
 
   // --- Init ---
   (function cleanOldPhotos() {
+    var now = Date.now();
+    var threeDays = 3 * 24 * 60 * 60 * 1000;
     var idx = loadIndex();
     for (var ci = 0; ci < idx.length; ci++) {
       var key = 'lv-' + idx[ci].id;
       try {
         var d = JSON.parse(localStorage.getItem(key) || '{}');
-        if (d._photos && Object.keys(d._photos).length > 0) {
+        if (!d._photos || !Object.keys(d._photos).length) continue;
+        var viewTime = d.time ? new Date(d.time).getTime() : 0;
+        if (viewTime && now - viewTime > threeDays) {
           delete d._photos;
           localStorage.setItem(key, JSON.stringify(d));
         }
