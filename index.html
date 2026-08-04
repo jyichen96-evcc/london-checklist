@@ -996,7 +996,7 @@
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
       var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(canvas.toDataURL('image/jpeg', 0.35));
+      cb(canvas.toDataURL('image/jpeg', 0.6));
     };
     img.src = dataUrl;
   }
@@ -1035,7 +1035,7 @@
         flash('正在处理照片…');
         var reader = new FileReader();
         reader.onload = function() {
-          resizeImage(reader.result, 600, function(compressed) {
+          resizeImage(reader.result, 1200, function(compressed) {
             photos[pk].push(compressed);
             savePhotos();
             renderPhotos(pk);
