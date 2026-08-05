@@ -569,7 +569,7 @@
         if (!idMap[ri.id]) { idMap[ri.id] = ri; changed = true; }
         else {
           var li = idMap[ri.id];
-          var fields = ['name','rent','recommend','avg'];
+          var fields = ['name','rent','recommend','avg','folder'];
           for (var fi = 0; fi < fields.length; fi++) {
             var f = fields[fi];
             if (ri[f] && ri[f] !== li[f]) { li[f] = ri[f]; changed = true; }
