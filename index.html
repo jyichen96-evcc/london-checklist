@@ -63,6 +63,21 @@
     .new-property-btn:active { border-color: #2d5a9e; color: #2d5a9e; }
     .empty-state { text-align: center; padding: 40px 20px; color: #888; }
     .empty-state p { font-size: 14px; margin-top: 8px; }
+    .folder-header {
+      font-size: 14px; font-weight: 600; color: #666; margin: 18px 0 8px;
+      display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+    }
+    .folder-header:first-child { margin-top: 0; }
+    .folder-arrow { font-size: 10px; transition: transform 0.2s; display: inline-block; }
+    .folder-arrow.collapsed { transform: rotate(-90deg); }
+    .folder-count { font-weight: 400; color: #aaa; font-size: 13px; }
+    .property-archive {
+      border: none; background: none; font-size: 16px;
+      cursor: pointer; padding: 4px 8px; flex-shrink: 0; color: #888;
+    }
+    .property-archive:active { color: #3a7d34; }
+    .done-item { opacity: 0.7; }
+    .done-item .property-name { color: #888; }
 
     /* Back button */
     .back-btn {
@@ -282,6 +297,8 @@
       .actions, .section-title { border-color: #333; }
       .ci input[type="checkbox"] { accent-color: #6b9fe8; }
       .new-property-btn { border-color: #444; color: #888; }
+      .folder-header { color: #999; }
+      .done-item .property-name { color: #666; }
       .todo-add-row input { background: #1a1a18; color: #e0ddd8; border-color: #444; }
       .todo-add-row button { background: #6b9fe8; border-color: #6b9fe8; color: #111; }
       .todo-item { border-color: #333; }
@@ -295,12 +312,13 @@
 <div class="page" id="homePage">
   <h1>伦敦看房清单</h1>
   <p class="subtitle">每套房独立记录，点击进入填写</p>
-  <ul class="property-list" id="propertyList"></ul>
+  <div id="folderActive"></div>
   <div class="empty-state" id="emptyState" style="display:none">
     <div style="font-size:36px">📋</div>
     <p>还没有房源记录，点击下方新建</p>
   </div>
   <button class="new-property-btn" id="newPropertyBtn" type="button">+ 新建看房记录</button>
+  <div id="folderDone"></div>
   <div id="homeSyncStatus" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:center;"></div>
 </div>
 
@@ -667,7 +685,7 @@
     for (var sk in state) {
       if (state.hasOwnProperty(sk)) toSave[sk] = state[sk];
     }
-    toSave._photos = photos;
+    if (getFolder(currentId) !== 'done') { toSave._photos = photos; }
     var stateStr = JSON.stringify(toSave);
     try {
       localStorage.setItem('lv-' + currentId, stateStr);
@@ -719,47 +737,121 @@
     renderPropertyList();
   }
 
+  function getFolder(id) {
+    var idx = loadIndex();
+    for (var i = 0; i < idx.length; i++) { if (idx[i].id === id) return idx[i].folder || 'active'; }
+    return 'active';
+  }
+
+  function setFolder(id, folder) {
+    var idx = loadIndex();
+    for (var i = 0; i < idx.length; i++) {
+      if (idx[i].id === id) { idx[i].folder = folder; break; }
+    }
+    saveIndex(idx);
+  }
+
+  function archiveProperty(id) {
+    var localData = loadState(id);
+    if (localData._photos && fbReady) {
+      PHOTO_REF.child(id).update(localData._photos);
+    }
+    delete localData._photos;
+    try { localStorage.setItem('lv-' + id, JSON.stringify(localData)); } catch(e) {}
+    setFolder(id, 'done');
+    renderPropertyList();
+    schedulePush();
+  }
+
+  function restoreProperty(id) {
+    setFolder(id, 'active');
+    renderPropertyList();
+    schedulePush();
+  }
+
+  var doneCollapsed = false;
+
+  function buildItem(item, isDone) {
+    var li = document.createElement('li');
+    li.className = 'property-item' + (isDone ? ' done-item' : '');
+    var info = document.createElement('div'); info.className = 'property-info';
+    var name = document.createElement('div'); name.className = 'property-name'; name.textContent = item.name || '未命名房源';
+    var meta = document.createElement('div'); meta.className = 'property-meta';
+    var parts = [];
+    if (item.rent) parts.push(item.rent);
+    if (item.recommend) parts.push(item.recommend);
+    meta.textContent = parts.join(' · ') || (isDone ? '' : '点击继续填写');
+    info.appendChild(name); info.appendChild(meta);
+    info.onclick = function() { openProperty(item.id); };
+
+    var score = document.createElement('div'); score.className = 'property-score';
+    score.textContent = item.avg || '–';
+    score.onclick = function() { openProperty(item.id); };
+
+    var arc = document.createElement('button'); arc.className = 'property-archive'; arc.type = 'button';
+    arc.textContent = isDone ? '↩' : '✓'; arc.title = isDone ? '恢复到编辑中' : '标记为已看完';
+    arc.onclick = function(e) {
+      e.stopPropagation();
+      if (isDone) { restoreProperty(item.id); }
+      else { archiveProperty(item.id); }
+    };
+
+    var del = document.createElement('button'); del.className = 'property-del'; del.type = 'button';
+    del.textContent = '×'; del.title = '删除';
+    del.onclick = function(e) {
+      e.stopPropagation();
+      if (!confirm('确定删除「' + (item.name || '未命名房源') + '」吗？')) return;
+      var newIdx = loadIndex(); var filtered = [];
+      for (var k = 0; k < newIdx.length; k++) { if (newIdx[k].id !== item.id) filtered.push(newIdx[k]); }
+      saveIndex(filtered);
+      try { localStorage.removeItem('lv-' + item.id); } catch(e) {}
+      if (fbReady) { PHOTO_REF.child(item.id).remove(); }
+      renderPropertyList();
+      schedulePush();
+    };
+
+    li.appendChild(info); li.appendChild(score); li.appendChild(arc); li.appendChild(del);
+    return li;
+  }
+
   function renderPropertyList() {
-    var list = document.getElementById('propertyList');
+    var activeBox = document.getElementById('folderActive');
+    var doneBox = document.getElementById('folderDone');
     var empty = document.getElementById('emptyState');
     var idx = loadIndex();
-    list.innerHTML = '';
+    activeBox.innerHTML = ''; doneBox.innerHTML = '';
+
+    var activeItems = [], doneItems = [];
+    for (var i = 0; i < idx.length; i++) {
+      if (idx[i].folder === 'done') doneItems.push(idx[i]);
+      else activeItems.push(idx[i]);
+    }
+
     if (idx.length === 0) { empty.style.display = ''; return; }
     empty.style.display = 'none';
-    for (var i = 0; i < idx.length; i++) {
-      (function(item) {
-        var li = document.createElement('li');
-        li.className = 'property-item';
-        var info = document.createElement('div'); info.className = 'property-info';
-        var name = document.createElement('div'); name.className = 'property-name'; name.textContent = item.name || '未命名房源';
-        var meta = document.createElement('div'); meta.className = 'property-meta';
-        var parts = [];
-        if (item.rent) parts.push(item.rent);
-        if (item.recommend) parts.push(item.recommend);
-        meta.textContent = parts.join(' · ') || '点击继续填写';
-        info.appendChild(name); info.appendChild(meta);
-        info.onclick = function() { openProperty(item.id); };
 
-        var score = document.createElement('div'); score.className = 'property-score';
-        score.textContent = item.avg || '–';
-        score.onclick = function() { openProperty(item.id); };
+    if (activeItems.length > 0) {
+      var h1 = document.createElement('div'); h1.className = 'folder-header';
+      h1.innerHTML = '<span class="folder-arrow">▼</span> 正在编辑 / 准备看 <span class="folder-count">(' + activeItems.length + ')</span>';
+      activeBox.appendChild(h1);
+      var list1 = document.createElement('ul'); list1.className = 'property-list';
+      for (var a = 0; a < activeItems.length; a++) { list1.appendChild(buildItem(activeItems[a], false)); }
+      activeBox.appendChild(list1);
+    }
 
-        var del = document.createElement('button'); del.className = 'property-del'; del.type = 'button';
-        del.textContent = '×'; del.title = '删除';
-        del.onclick = function(e) {
-          e.stopPropagation();
-          if (!confirm('确定删除「' + (item.name || '未命名房源') + '」吗？')) return;
-          var newIdx = loadIndex(); var filtered = [];
-          for (var k = 0; k < newIdx.length; k++) { if (newIdx[k].id !== item.id) filtered.push(newIdx[k]); }
-          saveIndex(filtered);
-          try { localStorage.removeItem('lv-' + item.id); } catch(e) {}
-          renderPropertyList();
-          schedulePush();
-        };
-
-        li.appendChild(info); li.appendChild(score); li.appendChild(del);
-        list.appendChild(li);
-      })(idx[i]);
+    if (doneItems.length > 0) {
+      var h2 = document.createElement('div'); h2.className = 'folder-header';
+      h2.innerHTML = '<span class="folder-arrow' + (doneCollapsed ? ' collapsed' : '') + '">▼</span> 已经看完 <span class="folder-count">(' + doneItems.length + ')</span>';
+      doneBox.appendChild(h2);
+      var list2 = document.createElement('ul'); list2.className = 'property-list';
+      list2.style.display = doneCollapsed ? 'none' : '';
+      for (var d = 0; d < doneItems.length; d++) { list2.appendChild(buildItem(doneItems[d], true)); }
+      doneBox.appendChild(list2);
+      h2.onclick = function() {
+        doneCollapsed = !doneCollapsed;
+        list2.style.display = doneCollapsed ? 'none' : '';
+        h2.querySelector('.folder-arrow').className = 'folder-arrow' + (doneCollapsed ? ' collapsed' : '');
+      };
     }
   }
 
