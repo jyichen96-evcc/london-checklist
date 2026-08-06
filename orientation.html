@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>看房朝向记录</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #fff; color: #1d1d1f;
+      max-width: 480px; margin: 0 auto;
+      padding: 20px 16px 40px;
+      -webkit-text-size-adjust: 100%;
+    }
+    h1 { font-size: 22px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; font-size: 13px; color: #888; margin-bottom: 20px; }
+    .back-link {
+      display: inline-block; color: #2d5a9e; font-size: 14px;
+      text-decoration: none; margin-bottom: 12px;
+    }
+
+    /* Start screen */
+    .start-screen { text-align: center; padding: 60px 20px; }
+    .start-screen .icon { font-size: 48px; margin-bottom: 12px; }
+    .start-screen p { font-size: 14px; color: #888; margin-bottom: 20px; line-height: 1.6; }
+    .start-btn {
+      padding: 14px 28px; border: none; border-radius: 10px;
+      background: #2d5a9e; color: #fff;
+      font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
+    }
+
+    /* Compass */
+    .compass-wrap { text-align: center; margin-bottom: 16px; }
+    .compass-box {
+      position: relative; width: 200px; height: 200px; margin: 0 auto;
+    }
+    .compass-pointer {
+      position: absolute; top: -6px; left: 50%;
+      transform: translateX(-50%); z-index: 2;
+      width: 0; height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 14px solid #e74c3c;
+    }
+    .compass-dial {
+      width: 100%; height: 100%;
+      border: 3px solid #e0e0e0; border-radius: 50%;
+      position: relative;
+      transition: transform 0.15s ease-out;
+    }
+    .compass-label {
+      position: absolute; font-weight: 700; font-size: 15px; color: #888;
+    }
+    .compass-label.cl-n { top: 10px; left: 50%; transform: translateX(-50%); color: #e74c3c; font-size: 17px; }
+    .compass-label.cl-s { bottom: 10px; left: 50%; transform: translateX(-50%); }
+    .compass-label.cl-e { right: 10px; top: 50%; transform: translateY(-50%); }
+    .compass-label.cl-w { left: 10px; top: 50%; transform: translateY(-50%); }
+    .compass-label.cl-ne { top: 26px; right: 22px; font-size: 11px; color: #aaa; }
+    .compass-label.cl-se { bottom: 26px; right: 22px; font-size: 11px; color: #aaa; }
+    .compass-label.cl-sw { bottom: 26px; left: 22px; font-size: 11px; color: #aaa; }
+    .compass-label.cl-nw { top: 26px; left: 22px; font-size: 11px; color: #aaa; }
+    .heading-num { font-size: 36px; font-weight: 700; margin-top: 8px; }
+    .heading-dir { font-size: 18px; color: #2d5a9e; font-weight: 600; }
+
+    /* Manual fallback */
+    .no-compass {
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;
+      padding: 10px 12px; font-size: 13px; color: #856404;
+      margin-bottom: 12px; text-align: center;
+    }
+    .manual-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 6px; margin: 0 0 16px;
+    }
+    .manual-btn {
+      padding: 10px; border: 1.5px solid #d0d0d0; border-radius: 8px;
+      background: #fff; font: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; text-align: center; color: #333;
+    }
+    .manual-btn:active, .manual-btn.sel {
+      border-color: #2d5a9e; background: #e8eff8; color: #2d5a9e;
+    }
+    .manual-blank { visibility: hidden; }
+
+    /* Room chips */
+    .room-row { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .room-chip {
+      padding: 6px 12px; border: 1px solid #d0d0d0; border-radius: 16px;
+      font-size: 13px; background: #fff; cursor: pointer;
+      -webkit-user-select: none; user-select: none;
+    }
+    .room-chip.on { background: #2d5a9e; border-color: #2d5a9e; color: #fff; }
+
+    /* Action buttons */
+    .actions { display: flex; gap: 10px; margin-bottom: 20px; }
+    .act-btn {
+      flex: 1; padding: 12px; border-radius: 10px;
+      font: inherit; font-size: 15px; font-weight: 600;
+      cursor: pointer; text-align: center; border: none;
+    }
+    .act-primary { background: #2d5a9e; color: #fff; }
+    .act-secondary { background: #f0f0f0; color: #666; }
+    .act-btn:active { opacity: 0.8; }
+    .hidden-input { display: none; }
+
+    /* Records */
+    .sec-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #888;
+      border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; margin-bottom: 10px;
+    }
+    .record-item {
+      display: flex; gap: 10px; padding: 10px;
+      background: #f8f8f7; border: 1px solid #eee; border-radius: 10px;
+      margin-bottom: 8px; align-items: center;
+    }
+    .record-thumb {
+      width: 56px; height: 56px; border-radius: 6px;
+      object-fit: cover; flex-shrink: 0; border: 1px solid #ddd;
+    }
+    .record-info { flex: 1; min-width: 0; }
+    .record-dir { font-size: 15px; font-weight: 700; color: #2d5a9e; }
+    .record-room {
+      display: inline-block; padding: 1px 8px; border-radius: 10px;
+      font-size: 11px; background: #e8eff8; color: #2d5a9e;
+      font-weight: 600; margin-left: 4px;
+    }
+    .record-time { font-size: 12px; color: #888; margin-top: 2px; }
+    .record-del {
+      border: none; background: none; color: #c44; font-size: 18px;
+      cursor: pointer; padding: 4px 8px; flex-shrink: 0;
+    }
+    .empty { text-align: center; padding: 28px; color: #888; font-size: 14px; }
+    .clear-btn {
+      display: block; width: 100%; padding: 10px; margin-top: 8px;
+      border: 1px solid #ddd; border-radius: 8px; background: #fff;
+      color: #888; font: inherit; font-size: 13px; cursor: pointer;
+      text-align: center;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1a18; color: #e0ddd8; }
+      .back-link { color: #6b9fe8; }
+      .compass-dial { border-color: #444; }
+      .compass-label { color: #666; }
+      .compass-label.cl-n { color: #e74c3c; }
+      .compass-label.cl-ne, .compass-label.cl-se, .compass-label.cl-sw, .compass-label.cl-nw { color: #555; }
+      .heading-num { color: #e0ddd8; }
+      .heading-dir { color: #6b9fe8; }
+      .start-btn, .act-primary { background: #6b9fe8; color: #111; }
+      .act-secondary { background: #333; color: #aaa; }
+      .room-chip { background: #1a1a18; border-color: #444; color: #ccc; }
+      .room-chip.on { background: #6b9fe8; border-color: #6b9fe8; color: #111; }
+      .record-item { background: #242422; border-color: #333; }
+      .record-dir { color: #6b9fe8; }
+      .record-room { background: #1e2a3a; color: #6b9fe8; }
+      .record-thumb { border-color: #444; }
+      .manual-btn { background: #242422; border-color: #444; color: #ccc; }
+      .manual-btn:active, .manual-btn.sel { border-color: #6b9fe8; background: #1e2a3a; color: #6b9fe8; }
+      .no-compass { background: #3a3518; border-color: #dbb30a; color: #e8d44d; }
+      .sec-title { border-color: #333; }
+      .clear-btn { background: #242422; border-color: #333; color: #888; }
+    }
+  </style>
+</head>
+<body>
+
+<a class="back-link" href="./index.html">&larr; 返回看房清单</a>
+
+<div id="startScreen" class="start-screen">
+  <div class="icon">🧭</div>
+  <h1>看房朝向记录</h1>
+  <p>对准窗户拍照，自动记录朝向方向<br>照片右上角自动标注方向，不用再对照指南针截图</p>
+  <button class="start-btn" id="startBtn" type="button">启用指南针</button>
+</div>
+
+<div id="mainScreen" style="display:none">
+  <h1>看房朝向记录</h1>
+  <p class="subtitle">手机对准窗户方向，点击拍照</p>
+
+  <div class="compass-wrap">
+    <div class="compass-box">
+      <div class="compass-pointer"></div>
+      <div class="compass-dial" id="compassDial">
+        <span class="compass-label cl-n">N</span>
+        <span class="compass-label cl-ne">NE</span>
+        <span class="compass-label cl-e">E</span>
+        <span class="compass-label cl-se">SE</span>
+        <span class="compass-label cl-s">S</span>
+        <span class="compass-label cl-sw">SW</span>
+        <span class="compass-label cl-w">W</span>
+        <span class="compass-label cl-nw">NW</span>
+      </div>
+    </div>
+    <div class="heading-num" id="headingNum">--°</div>
+    <div class="heading-dir" id="headingDir">等待指南针…</div>
+  </div>
+
+  <div id="noCompass" class="no-compass" style="display:none">
+    指南针不可用（可能在电脑上打开），请手动选择方向
+  </div>
+  <div id="manualBox" style="display:none">
+    <div class="manual-grid">
+      <button type="button" class="manual-btn" data-deg="315">西北 NW</button>
+      <button type="button" class="manual-btn" data-deg="0">北 N</button>
+      <button type="button" class="manual-btn" data-deg="45">东北 NE</button>
+      <button type="button" class="manual-btn" data-deg="270">西 W</button>
+      <button type="button" class="manual-btn manual-blank" data-deg="-1">&nbsp;</button>
+      <button type="button" class="manual-btn" data-deg="90">东 E</button>
+      <button type="button" class="manual-btn" data-deg="225">西南 SW</button>
+      <button type="button" class="manual-btn" data-deg="180">南 S</button>
+      <button type="button" class="manual-btn" data-deg="135">东南 SE</button>
+    </div>
+  </div>
+
+  <div class="room-row" id="roomRow">
+    <span class="room-chip on" data-room="">不标注</span>
+    <span class="room-chip" data-room="客厅">客厅</span>
+    <span class="room-chip" data-room="主卧">主卧</span>
+    <span class="room-chip" data-room="次卧">次卧</span>
+    <span class="room-chip" data-room="厨房">厨房</span>
+    <span class="room-chip" data-room="阳台">阳台</span>
+  </div>
+
+  <div class="actions">
+    <label class="act-btn act-primary" style="position:relative">
+      拍照记录方向
+      <input type="file" accept="image/*" capture="environment" id="photoInput" class="hidden-input">
+    </label>
+    <button class="act-btn act-secondary" id="recordBtn" type="button">仅记录方向</button>
+  </div>
+
+  <div class="sec-title" id="recTitle" style="display:none">已记录</div>
+  <div id="records"></div>
+  <button class="clear-btn" id="clearBtn" type="button" style="display:none">清除所有记录</button>
+</div>
+
+<canvas id="wmCanvas" style="display:none"></canvas>
+
+<script>
+(function() {
+  var currentHeading = null;
+  var compassOk = false;
+  var selectedRoom = '';
+  var records = [];
+  var KEY = 'orient-records';
+
+  var DIRS = [
+    [337.5, 360, '北', 'N'], [0, 22.5, '北', 'N'],
+    [22.5, 67.5, '东北', 'NE'], [67.5, 112.5, '东', 'E'],
+    [112.5, 157.5, '东南', 'SE'], [157.5, 202.5, '南', 'S'],
+    [202.5, 247.5, '西南', 'SW'], [247.5, 292.5, '西', 'W'],
+    [292.5, 337.5, '西北', 'NW']
+  ];
+
+  function getDir(deg) {
+    deg = ((deg % 360) + 360) % 360;
+    for (var i = 0; i < DIRS.length; i++) {
+      if (deg >= DIRS[i][0] && deg < DIRS[i][1]) return { cn: DIRS[i][2], en: DIRS[i][3] };
+    }
+    return { cn: '北', en: 'N' };
+  }
+
+  function fmtHeading(deg) {
+    if (deg === null) return { num: '--°', dir: '等待指南针…' };
+    var d = Math.round(((deg % 360) + 360) % 360);
+    var dir = getDir(d);
+    return { num: d + '°', dir: dir.cn + ' ' + dir.en };
+  }
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+  // --- Compass ---
+  function onOrientation(e) {
+    var h;
+    if (e.webkitCompassHeading !== undefined) {
+      h = e.webkitCompassHeading;
+    } else if (e.alpha !== null) {
+      h = (360 - e.alpha) % 360;
+    }
+    if (h !== undefined && !isNaN(h)) {
+      compassOk = true;
+      currentHeading = h;
+      updateUI();
+    }
+  }
+
+  function updateUI() {
+    if (currentHeading === null) return;
+    var f = fmtHeading(currentHeading);
+    document.getElementById('headingNum').textContent = f.num;
+    document.getElementById('headingDir').textContent = f.dir;
+    document.getElementById('compassDial').style.transform = 'rotate(' + (-currentHeading) + 'deg)';
+  }
+
+  function startCompass() {
+    document.getElementById('startScreen').style.display = 'none';
+    document.getElementById('mainScreen').style.display = '';
+
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(function(s) {
+        if (s === 'granted') {
+          window.addEventListener('deviceorientation', onOrientation);
+          setTimeout(function() { if (!compassOk) showManual(); }, 3000);
+        } else { showManual(); }
+      }).catch(function() { showManual(); });
+      return;
+    }
+
+    if ('ondeviceorientationabsolute' in window) {
+      window.addEventListener('deviceorientationabsolute', onOrientation);
+    }
+    if ('ondeviceorientation' in window) {
+      window.addEventListener('deviceorientation', onOrientation);
+    }
+    setTimeout(function() { if (!compassOk) showManual(); }, 3000);
+  }
+
+  function showManual() {
+    if (compassOk) return;
+    document.getElementById('noCompass').style.display = '';
+    document.getElementById('manualBox').style.display = '';
+    document.querySelector('.compass-box').style.opacity = '0.3';
+    document.getElementById('headingDir').textContent = '请手动选择方向';
+  }
+
+  // Manual buttons
+  document.addEventListener('click', function(e) {
+    var t = e.target;
+    if (!t.getAttribute || !t.getAttribute('data-deg')) return;
+    if (t.className.indexOf('manual-btn') < 0) return;
+    var deg = parseInt(t.getAttribute('data-deg'));
+    if (deg < 0) return;
+    currentHeading = deg;
+    var btns = document.querySelectorAll('.manual-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].className = btns[i].className.replace(' sel', '');
+    }
+    t.className += ' sel';
+    document.querySelector('.compass-box').style.opacity = '1';
+    updateUI();
+  });
+
+  // Room chips
+  document.getElementById('roomRow').addEventListener('click', function(e) {
+    var t = e.target;
+    if (t.className.indexOf('room-chip') < 0) return;
+    selectedRoom = t.getAttribute('data-room') || '';
+    var chips = document.querySelectorAll('.room-chip');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].className = chips[i].className.replace(' on', '');
+    }
+    t.className += ' on';
+  });
+
+  // --- Records ---
+  function loadRecords() {
+    try { records = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e) { records = []; }
+  }
+  function saveRecords() {
+    try { localStorage.setItem(KEY, JSON.stringify(records)); } catch(e) {}
+  }
+
+  function addRecord(heading, room, photo) {
+    var now = new Date();
+    records.unshift({
+      h: Math.round(((heading % 360) + 360) % 360),
+      r: room, p: photo || null,
+      t: pad2(now.getHours()) + ':' + pad2(now.getMinutes()),
+      id: 'r' + Date.now()
+    });
+    saveRecords();
+    renderRecords();
+  }
+
+  function renderRecords() {
+    var box = document.getElementById('records');
+    var title = document.getElementById('recTitle');
+    var clrBtn = document.getElementById('clearBtn');
+    box.innerHTML = '';
+
+    if (records.length === 0) {
+      title.style.display = 'none';
+      clrBtn.style.display = 'none';
+      box.innerHTML = '<div class="empty">还没有记录，对准窗户拍照开始</div>';
+      return;
+    }
+
+    title.style.display = '';
+    clrBtn.style.display = '';
+
+    for (var i = 0; i < records.length; i++) {
+      (function(rec, idx) {
+        var div = document.createElement('div');
+        div.className = 'record-item';
+
+        if (rec.p) {
+          var img = document.createElement('img');
+          img.className = 'record-thumb'; img.src = rec.p; img.alt = '';
+          div.appendChild(img);
+        }
+
+        var info = document.createElement('div');
+        info.className = 'record-info';
+        var f = fmtHeading(rec.h);
+
+        var dirEl = document.createElement('span');
+        dirEl.className = 'record-dir';
+        dirEl.textContent = f.dir + ' ' + f.num;
+        info.appendChild(dirEl);
+
+        if (rec.r) {
+          var rm = document.createElement('span');
+          rm.className = 'record-room'; rm.textContent = rec.r;
+          info.appendChild(rm);
+        }
+
+        var tm = document.createElement('div');
+        tm.className = 'record-time'; tm.textContent = rec.t;
+        info.appendChild(tm);
+        div.appendChild(info);
+
+        var del = document.createElement('button');
+        del.className = 'record-del'; del.type = 'button'; del.textContent = '×';
+        del.onclick = function() { records.splice(idx, 1); saveRecords(); renderRecords(); };
+        div.appendChild(del);
+
+        box.appendChild(div);
+      })(records[i], i);
+    }
+  }
+
+  // --- Photo with watermark ---
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  document.getElementById('photoInput').addEventListener('change', function(e) {
+    if (currentHeading === null) { alert('请先等待指南针就绪，或手动选择方向'); return; }
+    var files = e.target.files;
+    if (!files.length) return;
+    var heading = currentHeading;
+    var room = selectedRoom;
+
+    var reader = new FileReader();
+    reader.onload = function() {
+      var img = new Image();
+      img.onload = function() {
+        var maxW = 1200;
+        var w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+
+        var canvas = document.getElementById('wmCanvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        var f = fmtHeading(heading);
+        var text = f.dir + ' ' + f.num;
+        if (room) text = room + ' · ' + text;
+
+        var fs = Math.max(16, Math.round(w * 0.028));
+        ctx.font = 'bold ' + fs + 'px -apple-system, PingFang SC, sans-serif';
+        var tw = ctx.measureText(text).width;
+        var px = 10, py = 6;
+        var bw = tw + px * 2, bh = fs + py * 2 + 2;
+        var bx = w - bw - 12, by = 12;
+
+        roundRect(ctx, bx, by, bw, bh, 6);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fill();
+
+        ctx.fillStyle = '#fff';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        ctx.fillText(text, bx + px, by + bh / 2);
+
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        addRecord(heading, room, dataUrl);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(files[0]);
+    e.target.value = '';
+  });
+
+  // Record direction only
+  document.getElementById('recordBtn').onclick = function() {
+    if (currentHeading === null) { alert('请先等待指南针就绪，或手动选择方向'); return; }
+    addRecord(currentHeading, selectedRoom, null);
+  };
+
+  // Clear
+  document.getElementById('clearBtn').onclick = function() {
+    if (!confirm('确定清除所有记录吗？')) return;
+    records = [];
+    saveRecords();
+    renderRecords();
+  };
+
+  // Start
+  document.getElementById('startBtn').onclick = startCompass;
+
+  // Init
+  loadRecords();
+  if (records.length > 0) {
+    startCompass();
+  } else {
+    renderRecords();
+  }
+})();
+</script>
+</body>
+</html>
