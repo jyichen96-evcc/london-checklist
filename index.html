@@ -268,6 +268,47 @@
     .btn-blue { background: #2d5a9e; color: #fff; }
     .toast { margin-top: 8px; font-size: 13px; color: #3a7d34; min-height: 18px; }
 
+    /* Compare mode */
+    .compare-toggle {
+      display: inline-block; padding: 8px 14px; margin-top: 10px;
+      border: 1px solid #2d5a9e; border-radius: 8px;
+      background: transparent; color: #2d5a9e; font: inherit; font-size: 14px;
+      cursor: pointer; width: 100%; text-align: center;
+    }
+    .compare-toggle.on { background: #2d5a9e; color: #fff; }
+    .compare-cb {
+      width: 22px; height: 22px; accent-color: #2d5a9e; flex-shrink: 0; cursor: pointer;
+    }
+    .compare-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #2d5a9e; color: #fff;
+      padding: 12px 16px; font-size: 14px; font-weight: 600;
+      z-index: 100; display: none;
+      justify-content: center; align-items: center; gap: 10px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    .compare-bar.show { display: flex; }
+    .compare-bar button {
+      padding: 6px 14px; border: 1.5px solid #fff; border-radius: 8px;
+      background: #fff; color: #2d5a9e; font: inherit; font-size: 13px;
+      font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .compare-bar .cbar-cancel { background: transparent; color: #fff; }
+    .property-item.compare-selected { border-color: #2d5a9e; background: #eef3fb; }
+    /* Compare page */
+    .cmp-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; overflow-x: auto; display: block; }
+    .cmp-table th { background: #2d5a9e; color: #fff; padding: 6px 8px; text-align: left; font-size: 12px; white-space: nowrap; position: sticky; top: 0; }
+    .cmp-table td { padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: top; min-width: 80px; }
+    .cmp-table tr:nth-child(even) { background: #f8f9fb; }
+    .cmp-table td:first-child { font-weight: 500; white-space: nowrap; }
+    .cmp-cards { display: grid; gap: 10px; margin: 6px 0; }
+    .cmp-card { background: #f8f8f7; border: 1px solid #eee; border-radius: 10px; padding: 12px; }
+    .cmp-card h3 { font-size: 14px; margin-bottom: 6px; color: #2d5a9e; }
+    .cmp-card p { white-space: pre-wrap; font-size: 13px; line-height: 1.5; }
+    .cmp-legend { display: flex; gap: 14px; justify-content: center; margin: 8px 0; flex-wrap: wrap; }
+    .cmp-legend-item { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+    .cmp-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
     @media (prefers-color-scheme: dark) {
       body { background: #1a1a18; color: #e0ddd8; }
       .card, .property-item { background: #242422; border-color: #333; }
@@ -296,6 +337,16 @@
       .todo-add-row button { background: #6b9fe8; border-color: #6b9fe8; color: #111; }
       .todo-item { border-color: #333; }
       .todo-cal { color: #6b9fe8; }
+      .compare-toggle { border-color: #6b9fe8; color: #6b9fe8; }
+      .compare-toggle.on { background: #6b9fe8; color: #111; }
+      .compare-cb { accent-color: #6b9fe8; }
+      .compare-bar { background: #3a5a8e; }
+      .property-item.compare-selected { border-color: #6b9fe8; background: #1e2a3a; }
+      .cmp-table th { background: #3a5a8e; }
+      .cmp-table td { border-color: #333; }
+      .cmp-table tr:nth-child(even) { background: #2a2a28; }
+      .cmp-card { background: #242422; border-color: #333; }
+      .cmp-card h3 { color: #6b9fe8; }
     }
   </style>
 </head>
@@ -311,6 +362,7 @@
     <p>还没有房源记录，点击下方新建</p>
   </div>
   <button class="new-property-btn" id="newPropertyBtn" type="button">+ 新建看房记录</button>
+  <button class="compare-toggle" id="compareToggle" type="button">对比模式</button>
   <div id="folderDone"></div>
   <div id="homeSyncStatus" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:center;"></div>
 </div>
@@ -449,6 +501,22 @@
   </div>
   <p class="toast" id="toast"></p>
   <div id="syncStatus" style="margin-top:6px;font-size:12px;color:#888;min-height:16px;"></div>
+</div>
+
+<!-- ========== COMPARE PAGE ========== -->
+<div class="page" id="comparePage">
+  <button class="back-btn" id="compareBackBtn" type="button">&larr; 返回列表</button>
+  <h1 style="font-size:20px;margin-bottom:12px" id="compareTitle"></h1>
+  <div id="compareContent"></div>
+  <div class="actions">
+    <button class="btn btn-blue" id="compareExportBtn">导出对比报告</button>
+  </div>
+</div>
+
+<div class="compare-bar" id="compareBar">
+  <span id="compareBarText">请选择 2-3 套房源</span>
+  <button type="button" id="compareGenBtn" style="display:none">生成对比</button>
+  <button type="button" class="cbar-cancel" id="compareCancelBtn">取消</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -726,6 +794,11 @@
     currentId = null; state = {}; photos = {};
     homePage.className = 'page active';
     formPage.className = 'page';
+    document.getElementById('comparePage').className = 'page';
+    compareMode = false; compareSelected = [];
+    document.getElementById('compareToggle').className = 'compare-toggle';
+    document.getElementById('compareToggle').textContent = '对比模式';
+    updateCompareBar();
     window.location.hash = '';
     renderPropertyList();
   }
@@ -763,10 +836,46 @@
   }
 
   var doneCollapsed = false;
+  var compareMode = false;
+  var compareSelected = [];
+
+  function toggleCompareSelect(id) {
+    var pos = -1;
+    for (var i = 0; i < compareSelected.length; i++) { if (compareSelected[i] === id) { pos = i; break; } }
+    if (pos >= 0) compareSelected.splice(pos, 1);
+    else if (compareSelected.length < 3) compareSelected.push(id);
+    renderPropertyList();
+    updateCompareBar();
+  }
+
+  function updateCompareBar() {
+    var bar = document.getElementById('compareBar');
+    var txt = document.getElementById('compareBarText');
+    var genBtn = document.getElementById('compareGenBtn');
+    if (!compareMode) { bar.className = 'compare-bar'; return; }
+    bar.className = 'compare-bar show';
+    if (compareSelected.length < 2) {
+      txt.textContent = '请选择 2-3 套房源（已选 ' + compareSelected.length + '）';
+      genBtn.style.display = 'none';
+    } else {
+      txt.textContent = '已选 ' + compareSelected.length + ' 套';
+      genBtn.style.display = '';
+    }
+  }
 
   function buildItem(item, isDone) {
     var li = document.createElement('li');
-    li.className = 'property-item' + (isDone ? ' done-item' : '');
+    var isSelected = false;
+    for (var si = 0; si < compareSelected.length; si++) { if (compareSelected[si] === item.id) isSelected = true; }
+    li.className = 'property-item' + (isDone ? ' done-item' : '') + (compareMode && isSelected ? ' compare-selected' : '');
+
+    if (compareMode) {
+      var cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'compare-cb'; cb.checked = isSelected;
+      (function(iid) { cb.onclick = function(e) { e.stopPropagation(); toggleCompareSelect(iid); }; })(item.id);
+      li.appendChild(cb);
+    }
+
     var info = document.createElement('div'); info.className = 'property-info';
     var name = document.createElement('div'); name.className = 'property-name'; name.textContent = item.name || '未命名房源';
     var meta = document.createElement('div'); meta.className = 'property-meta';
@@ -775,35 +884,44 @@
     if (item.recommend) parts.push(item.recommend);
     meta.textContent = parts.join(' · ') || (isDone ? '' : '点击继续填写');
     info.appendChild(name); info.appendChild(meta);
-    info.onclick = function() { openProperty(item.id); };
 
     var score = document.createElement('div'); score.className = 'property-score';
     score.textContent = item.avg || '–';
-    score.onclick = function() { openProperty(item.id); };
 
-    var arc = document.createElement('button'); arc.className = 'property-archive'; arc.type = 'button';
-    arc.textContent = isDone ? '↩' : '✓'; arc.title = isDone ? '恢复到编辑中' : '标记为已看完';
-    arc.onclick = function(e) {
-      e.stopPropagation();
-      if (isDone) { restoreProperty(item.id); }
-      else { archiveProperty(item.id); }
-    };
+    if (compareMode) {
+      (function(iid) {
+        var handler = function() { toggleCompareSelect(iid); };
+        info.onclick = handler; score.onclick = handler;
+      })(item.id);
+      li.appendChild(info); li.appendChild(score);
+    } else {
+      info.onclick = function() { openProperty(item.id); };
+      score.onclick = function() { openProperty(item.id); };
 
-    var del = document.createElement('button'); del.className = 'property-del'; del.type = 'button';
-    del.textContent = '×'; del.title = '删除';
-    del.onclick = function(e) {
-      e.stopPropagation();
-      if (!confirm('确定删除「' + (item.name || '未命名房源') + '」吗？')) return;
-      var newIdx = loadIndex(); var filtered = [];
-      for (var k = 0; k < newIdx.length; k++) { if (newIdx[k].id !== item.id) filtered.push(newIdx[k]); }
-      saveIndex(filtered);
-      try { localStorage.removeItem('lv-' + item.id); } catch(e) {}
-      if (fbReady) { PHOTO_REF.child(item.id).remove(); }
-      renderPropertyList();
-      schedulePush();
-    };
+      var arc = document.createElement('button'); arc.className = 'property-archive'; arc.type = 'button';
+      arc.textContent = isDone ? '↩' : '✓'; arc.title = isDone ? '恢复到编辑中' : '标记为已看完';
+      arc.onclick = function(e) {
+        e.stopPropagation();
+        if (isDone) { restoreProperty(item.id); }
+        else { archiveProperty(item.id); }
+      };
 
-    li.appendChild(info); li.appendChild(score); li.appendChild(arc); li.appendChild(del);
+      var del = document.createElement('button'); del.className = 'property-del'; del.type = 'button';
+      del.textContent = '×'; del.title = '删除';
+      del.onclick = function(e) {
+        e.stopPropagation();
+        if (!confirm('确定删除「' + (item.name || '未命名房源') + '」吗？')) return;
+        var newIdx = loadIndex(); var filtered = [];
+        for (var k = 0; k < newIdx.length; k++) { if (newIdx[k].id !== item.id) filtered.push(newIdx[k]); }
+        saveIndex(filtered);
+        try { localStorage.removeItem('lv-' + item.id); } catch(e) {}
+        if (fbReady) { PHOTO_REF.child(item.id).remove(); }
+        renderPropertyList();
+        schedulePush();
+      };
+
+      li.appendChild(info); li.appendChild(score); li.appendChild(arc); li.appendChild(del);
+    }
     return li;
   }
 
@@ -887,6 +1005,7 @@
 
     homePage.className = 'page';
     formPage.className = 'page active';
+    document.getElementById('comparePage').className = 'page';
     window.location.hash = 'id=' + id;
 
     clearForm();
@@ -1457,6 +1576,287 @@
     var blob = new Blob([html], {type: 'text/html;charset=utf-8'});
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = '看房报告-' + esc(g('address') || '未命名').replace(/[\\/:*?"<>|]/g, '_') + '.html';
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  // --- Compare mode ---
+  document.getElementById('compareToggle').onclick = function() {
+    compareMode = !compareMode;
+    compareSelected = [];
+    var btn = document.getElementById('compareToggle');
+    btn.className = compareMode ? 'compare-toggle on' : 'compare-toggle';
+    btn.textContent = compareMode ? '退出对比' : '对比模式';
+    renderPropertyList();
+    updateCompareBar();
+  };
+  document.getElementById('compareCancelBtn').onclick = function() {
+    compareMode = false; compareSelected = [];
+    document.getElementById('compareToggle').className = 'compare-toggle';
+    document.getElementById('compareToggle').textContent = '对比模式';
+    renderPropertyList(); updateCompareBar();
+  };
+  document.getElementById('compareGenBtn').onclick = function() { showComparePage(); };
+  document.getElementById('compareBackBtn').onclick = function() { showHome(); };
+
+  function showComparePage() {
+    var props = [];
+    var idx = loadIndex();
+    for (var i = 0; i < compareSelected.length; i++) {
+      var id = compareSelected[i];
+      var data = loadState(id);
+      var meta = null;
+      for (var j = 0; j < idx.length; j++) { if (idx[j].id === id) { meta = idx[j]; break; } }
+      props.push({ id: id, data: data, meta: meta });
+    }
+    homePage.className = 'page';
+    formPage.className = 'page';
+    document.getElementById('comparePage').className = 'page active';
+    document.getElementById('compareBar').className = 'compare-bar';
+    renderComparePage(props);
+    window.scrollTo(0, 0);
+  }
+
+  var CMP_COLORS = ['#2d5a9e', '#e67e22', '#27ae60'];
+  var CMP_FILLS = ['rgba(45,90,158,0.12)', 'rgba(230,126,34,0.12)', 'rgba(39,174,96,0.12)'];
+
+  function renderComparePage(props) {
+    var n = props.length;
+    var names = [];
+    for (var i = 0; i < n; i++) names.push(props[i].data.address || (props[i].meta && props[i].meta.name) || '未命名');
+
+    document.getElementById('compareTitle').textContent = names.join(' vs ');
+
+    var h = '';
+    // Basic info
+    h += '<div class="section"><div class="section-title">基本信息</div>';
+    h += '<table class="cmp-table"><tr><th>项目</th>';
+    for (var i = 0; i < n; i++) h += '<th style="color:' + CMP_COLORS[i] + ';background:#fff;border-bottom:3px solid ' + CMP_COLORS[i] + '">' + esc(names[i]) + '</th>';
+    h += '</tr>';
+    var infoF = [{k:'rent',l:'租金'},{k:'time',l:'看房时间'},{k:'agent',l:'中介'},{k:'recommend',l:'是否推荐'}];
+    for (var fi = 0; fi < infoF.length; fi++) {
+      h += '<tr><td>' + infoF[fi].l + '</td>';
+      for (var i = 0; i < n; i++) h += '<td>' + esc(props[i].data[infoF[fi].k] || '—') + '</td>';
+      h += '</tr>';
+    }
+    h += '</table></div>';
+
+    // Score comparison
+    h += '<div class="section"><div class="section-title">评分对比</div>';
+    h += '<div style="text-align:center"><canvas id="compareRadar" width="300" height="300" style="max-width:300px"></canvas></div>';
+    h += '<div class="cmp-legend">';
+    for (var i = 0; i < n; i++) h += '<div class="cmp-legend-item"><div class="cmp-legend-dot" style="background:' + CMP_COLORS[i] + '"></div>' + esc(names[i]) + '</div>';
+    h += '</div>';
+    h += '<table class="cmp-table"><tr><th>维度</th>';
+    for (var i = 0; i < n; i++) h += '<th>' + esc(names[i]) + '</th>';
+    h += '</tr>';
+    for (var si = 0; si < SCORE_KEYS.length; si++) {
+      h += '<tr><td>' + SCORE_NAMES[si] + '</td>';
+      var vals = [];
+      for (var i = 0; i < n; i++) { var sv = Number(props[i].data[SCORE_KEYS[si]]) || 0; vals.push(sv); }
+      var maxV = 0; for (var i = 0; i < vals.length; i++) { if (vals[i] > maxV) maxV = vals[i]; }
+      for (var i = 0; i < n; i++) {
+        var svt = (vals[i] >= 1 && vals[i] <= 5) ? LEVEL_NAMES[vals[i]] : '—';
+        var style = '';
+        if (vals[i] > 0 && vals[i] === maxV && maxV > 0) {
+          var allSame = true; for (var j = 0; j < vals.length; j++) { if (vals[j] !== maxV) allSame = false; }
+          if (!allSame) style = ' style="color:#1e8449;font-weight:600"';
+        }
+        h += '<td' + style + '>' + svt + '</td>';
+      }
+      h += '</tr>';
+    }
+    h += '</table></div>';
+
+    // Differences
+    var diffRows = '', sameRows = '';
+    var allKeys = [];
+    for (var ci = 0; ci <= 47; ci++) allKeys.push(ci);
+    for (var di = 0; di < allKeys.length; di++) {
+      var ck = 'c' + allKeys[di];
+      var nk = ck + '-n';
+      var notes = []; var hasAny = false;
+      for (var i = 0; i < n; i++) { var note = (props[i].data[nk] || '').replace(/^\s+|\s+$/g, ''); notes.push(note); if (note) hasAny = true; }
+      if (!hasAny) continue;
+      var allSame = true;
+      for (var i = 1; i < n; i++) { if (notes[i] !== notes[0]) { allSame = false; break; } }
+      var label = itemLabels[allKeys[di]] || ck;
+      if (allSame) {
+        sameRows += '<tr><td>' + esc(label) + '</td><td colspan="' + n + '">' + esc(notes[0]) + '</td></tr>';
+      } else {
+        diffRows += '<tr><td>' + esc(label) + '</td>';
+        for (var i = 0; i < n; i++) diffRows += '<td>' + esc(notes[i] || '—') + '</td>';
+        diffRows += '</tr>';
+      }
+    }
+    if (diffRows) {
+      h += '<div class="section"><div class="section-title">差异项</div>';
+      h += '<table class="cmp-table"><tr><th>检查项</th>';
+      for (var i = 0; i < n; i++) h += '<th>' + esc(names[i]) + '</th>';
+      h += '</tr>' + diffRows + '</table></div>';
+    }
+    if (sameRows) {
+      h += '<div class="section"><div class="section-title">共同特点</div>';
+      h += '<table class="cmp-table"><tr><th>检查项</th><th>备注</th></tr>' + sameRows + '</table></div>';
+    }
+
+    // Conclusions
+    var conF = [{k:'pros',l:'核心优点'},{k:'cons',l:'需要注意'},{k:'next',l:'建议与下一步'}];
+    var hasCon = false;
+    for (var cfi = 0; cfi < conF.length; cfi++) { for (var i = 0; i < n; i++) { if (props[i].data[conF[cfi].k]) hasCon = true; } }
+    if (hasCon) {
+      h += '<div class="section"><div class="section-title">结论对比</div>';
+      for (var cfi = 0; cfi < conF.length; cfi++) {
+        var cf = conF[cfi]; var any = false;
+        for (var i = 0; i < n; i++) { if (props[i].data[cf.k]) any = true; }
+        if (!any) continue;
+        h += '<p style="font-weight:600;margin:10px 0 6px">' + cf.l + '</p>';
+        h += '<div class="cmp-cards" style="grid-template-columns:' + new Array(n + 1).join('1fr ').replace(/\s+$/,'') + '">';
+        for (var i = 0; i < n; i++) {
+          h += '<div class="cmp-card"><h3>' + esc(names[i]) + '</h3><p>' + esc(props[i].data[cf.k] || '—') + '</p></div>';
+        }
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+
+    document.getElementById('compareContent').innerHTML = h;
+    setTimeout(function() { drawCompareRadar(props); }, 50);
+  }
+
+  function drawCompareRadar(props) {
+    var canvas = document.getElementById('compareRadar');
+    if (!canvas || !canvas.getContext) return;
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    var cx = w/2, cy = h/2, r = Math.min(cx,cy) - 40;
+    var sn = SCORE_KEYS.length;
+    var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var step = (2*Math.PI)/sn, start = -Math.PI/2;
+    ctx.clearRect(0, 0, w, h);
+    for (var lv = 1; lv <= 5; lv++) {
+      ctx.beginPath();
+      for (var j = 0; j <= sn; j++) { var a = start+(j%sn)*step; var lr = r*lv/5; if (j===0) ctx.moveTo(cx+lr*Math.cos(a),cy+lr*Math.sin(a)); else ctx.lineTo(cx+lr*Math.cos(a),cy+lr*Math.sin(a)); }
+      ctx.strokeStyle = dark ? (lv===3?'#555':'#333') : (lv===3?'#ccc':'#e8e8e8'); ctx.lineWidth = lv===3?1.5:0.8; ctx.stroke();
+    }
+    for (var ai = 0; ai < sn; ai++) { var a = start+ai*step; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a)); ctx.strokeStyle = dark?'#444':'#ddd'; ctx.lineWidth = 0.8; ctx.stroke(); }
+    for (var pi = 0; pi < props.length; pi++) {
+      var vals = []; for (var si = 0; si < sn; si++) vals.push(Number(props[pi].data[SCORE_KEYS[si]]) || 0);
+      ctx.beginPath();
+      for (var p = 0; p <= sn; p++) { var a = start+(p%sn)*step; var dr = r*vals[p%sn]/5; if (p===0) ctx.moveTo(cx+dr*Math.cos(a),cy+dr*Math.sin(a)); else ctx.lineTo(cx+dr*Math.cos(a),cy+dr*Math.sin(a)); }
+      ctx.fillStyle = CMP_FILLS[pi]; ctx.fill(); ctx.strokeStyle = CMP_COLORS[pi]; ctx.lineWidth = 2; ctx.stroke();
+      for (var pt = 0; pt < sn; pt++) { if (vals[pt] > 0) { var a = start+pt*step; var dr = r*vals[pt]/5; ctx.beginPath(); ctx.arc(cx+dr*Math.cos(a),cy+dr*Math.sin(a),4,0,2*Math.PI); ctx.fillStyle = CMP_COLORS[pi]; ctx.fill(); } }
+    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '12px -apple-system, sans-serif'; ctx.fillStyle = dark?'#aaa':'#666';
+    for (var l = 0; l < sn; l++) { var a = start+l*step; ctx.fillText(SCORE_NAMES[l], cx+(r+26)*Math.cos(a), cy+(r+26)*Math.sin(a)); }
+  }
+
+  // --- Compare export ---
+  document.getElementById('compareExportBtn').onclick = function() {
+    var props = [];
+    var idx = loadIndex();
+    for (var i = 0; i < compareSelected.length; i++) {
+      var id = compareSelected[i]; var data = loadState(id); var meta = null;
+      for (var j = 0; j < idx.length; j++) { if (idx[j].id === id) { meta = idx[j]; break; } }
+      props.push({ id: id, data: data, meta: meta });
+    }
+    var n = props.length;
+    var names = [];
+    for (var i = 0; i < n; i++) names.push(props[i].data.address || (props[i].meta && props[i].meta.name) || '未命名');
+
+    var out = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    out += '<title>' + esc(names.join(' vs ')) + ' 对比报告</title>';
+    out += '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,"PingFang SC",sans-serif;max-width:800px;margin:0 auto;padding:20px;color:#222;background:#fff;font-size:13px;line-height:1.6}';
+    out += 'h1{font-size:20px;color:#2d5a9e;text-align:center;margin-bottom:4px}h2{font-size:14px;color:#2d5a9e;margin:18px 0 6px;padding-bottom:3px;border-bottom:2px solid #e8eff8}';
+    out += 'table{width:100%;border-collapse:collapse;margin:6px 0}th{background:#2d5a9e;color:#fff;padding:6px 8px;text-align:left;font-size:12px}';
+    out += 'td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}tr:nth-child(even){background:#f8f9fb}';
+    out += '.cards{display:grid;gap:8px;margin:6px 0}.card{border:1px solid #eee;border-radius:8px;padding:10px}.card b{display:block;font-size:12px;color:#2d5a9e;margin-bottom:3px}';
+    out += '.card p{white-space:pre-wrap}.hi{color:#1e8449;font-weight:600}';
+    out += '@media print{body{padding:10px}h1{font-size:18px}}</style></head><body>';
+
+    out += '<h1>' + esc(names.join(' vs ')) + ' 对比报告</h1>';
+    out += '<p style="text-align:center;color:#888;font-size:11px;margin-bottom:14px">导出时间: ' + new Date().toLocaleDateString('zh-CN') + '</p>';
+
+    // Basic info
+    out += '<h2>基本信息</h2><table><tr><th>项目</th>';
+    for (var i = 0; i < n; i++) out += '<th>' + esc(names[i]) + '</th>';
+    out += '</tr>';
+    var expInfo = [{k:'rent',l:'租金'},{k:'time',l:'看房时间'},{k:'agent',l:'中介'},{k:'recommend',l:'是否推荐'}];
+    for (var fi = 0; fi < expInfo.length; fi++) {
+      out += '<tr><td>' + expInfo[fi].l + '</td>';
+      for (var i = 0; i < n; i++) out += '<td>' + esc(props[i].data[expInfo[fi].k] || '—') + '</td>';
+      out += '</tr>';
+    }
+    out += '</table>';
+
+    // Scores with SVG radar
+    var rCx = 140, rCy = 140, rR = 100, rN = 6, rStep = (2*Math.PI)/rN, rStart = -Math.PI/2;
+    var svg = '<svg viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;max-width:280px">';
+    for (var rl = 1; rl <= 5; rl++) {
+      var pts = '';
+      for (var rj = 0; rj < rN; rj++) { var ra = rStart + rj*rStep; pts += (rCx+rR*rl/5*Math.cos(ra))+','+(rCy+rR*rl/5*Math.sin(ra))+' '; }
+      svg += '<polygon points="'+pts+'" fill="none" stroke="'+(rl===3?'#bbb':'#ddd')+'" stroke-width="'+(rl===3?'1.5':'0.8')+'"/>';
+    }
+    for (var ra2 = 0; ra2 < rN; ra2++) { var a2 = rStart+ra2*rStep; svg += '<line x1="'+rCx+'" y1="'+rCy+'" x2="'+(rCx+rR*Math.cos(a2))+'" y2="'+(rCy+rR*Math.sin(a2))+'" stroke="#ddd" stroke-width="0.8"/>'; }
+    for (var pi = 0; pi < n; pi++) {
+      var dataPts = '';
+      for (var rd = 0; rd < rN; rd++) { var rv = Number(props[pi].data[SCORE_KEYS[rd]]) || 0; var ra3 = rStart+rd*rStep; dataPts += (rCx+rR*rv/5*Math.cos(ra3))+','+(rCy+rR*rv/5*Math.sin(ra3))+' '; }
+      svg += '<polygon points="'+dataPts+'" fill="'+CMP_FILLS[pi]+'" stroke="'+CMP_COLORS[pi]+'" stroke-width="2"/>';
+      for (var rd2 = 0; rd2 < rN; rd2++) { var rv2 = Number(props[pi].data[SCORE_KEYS[rd2]]) || 0; if (rv2 > 0) { var ra4 = rStart+rd2*rStep; svg += '<circle cx="'+(rCx+rR*rv2/5*Math.cos(ra4))+'" cy="'+(rCy+rR*rv2/5*Math.sin(ra4))+'" r="4" fill="'+CMP_COLORS[pi]+'"/>'; } }
+    }
+    for (var rl2 = 0; rl2 < rN; rl2++) { var la = rStart+rl2*rStep; svg += '<text x="'+(rCx+(rR+22)*Math.cos(la))+'" y="'+(rCy+(rR+22)*Math.sin(la))+'" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="#666">'+SCORE_NAMES[rl2]+'</text>'; }
+    svg += '</svg>';
+    out += '<h2>评分对比</h2>' + svg;
+    out += '<div style="text-align:center;margin:6px 0;font-size:11px">';
+    for (var i = 0; i < n; i++) out += '<span style="display:inline-block;margin:0 8px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+CMP_COLORS[i]+';vertical-align:middle"></span> '+esc(names[i])+'</span>';
+    out += '</div>';
+    out += '<table><tr><th>维度</th>';
+    for (var i = 0; i < n; i++) out += '<th>' + esc(names[i]) + '</th>';
+    out += '</tr>';
+    for (var si = 0; si < SCORE_KEYS.length; si++) {
+      out += '<tr><td>' + SCORE_NAMES[si] + '</td>';
+      for (var i = 0; i < n; i++) { var sv = Number(props[i].data[SCORE_KEYS[si]]) || 0; out += '<td>' + ((sv >= 1 && sv <= 5) ? LEVEL_NAMES[sv] : '—') + '</td>'; }
+      out += '</tr>';
+    }
+    out += '</table>';
+
+    // Differences
+    var eDiff = '', eSame = '';
+    for (var di = 0; di <= 47; di++) {
+      var nk = 'c' + di + '-n';
+      var notes = []; var hasAny = false;
+      for (var i = 0; i < n; i++) { var note = (props[i].data[nk] || '').replace(/^\s+|\s+$/g, ''); notes.push(note); if (note) hasAny = true; }
+      if (!hasAny) continue;
+      var allSame = true; for (var i = 1; i < n; i++) { if (notes[i] !== notes[0]) allSame = false; }
+      var label = itemLabels[di] || ('c' + di);
+      if (allSame) { eSame += '<tr><td>' + esc(label) + '</td><td colspan="' + n + '">' + esc(notes[0]) + '</td></tr>'; }
+      else { eDiff += '<tr><td>' + esc(label) + '</td>'; for (var i = 0; i < n; i++) eDiff += '<td>' + esc(notes[i] || '—') + '</td>'; eDiff += '</tr>'; }
+    }
+    if (eDiff) {
+      out += '<h2>差异项</h2><table><tr><th>检查项</th>';
+      for (var i = 0; i < n; i++) out += '<th>' + esc(names[i]) + '</th>';
+      out += '</tr>' + eDiff + '</table>';
+    }
+    if (eSame) {
+      out += '<h2>共同特点</h2><table><tr><th>检查项</th><th>备注</th></tr>' + eSame + '</table>';
+    }
+
+    // Conclusions
+    var conF2 = [{k:'pros',l:'核心优点'},{k:'cons',l:'需要注意'},{k:'next',l:'建议与下一步'}];
+    for (var cfi = 0; cfi < conF2.length; cfi++) {
+      var cf = conF2[cfi]; var any = false;
+      for (var i = 0; i < n; i++) { if (props[i].data[cf.k]) any = true; }
+      if (!any) continue;
+      out += '<h2>' + cf.l + '</h2><div class="cards" style="grid-template-columns:' + new Array(n+1).join('1fr ').replace(/\s+$/,'') + '">';
+      for (var i = 0; i < n; i++) out += '<div class="card"><b>' + esc(names[i]) + '</b><p>' + esc(props[i].data[cf.k] || '—') + '</p></div>';
+      out += '</div>';
+    }
+
+    out += '<p style="margin-top:24px;color:#bbb;font-size:10px;text-align:center">导出自伦敦看房清单</p></body></html>';
+
+    var blob = new Blob([out], {type: 'text/html;charset=utf-8'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '对比报告-' + names.join('-vs-').replace(/[\\/:*?"<>|]/g, '_') + '.html';
     a.click(); URL.revokeObjectURL(a.href);
   };
 
